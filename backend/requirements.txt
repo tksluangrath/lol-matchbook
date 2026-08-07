@@ -1,0 +1,41 @@
+# Web framework -- see docs/tech-stack.md #2
+fastapi
+uvicorn[standard]
+websockets
+
+# DB -- Postgres + pgvector via embedded pgserver, see docs/tech-stack.md #4
+pgserver
+sqlalchemy
+pgvector
+psycopg[binary]
+
+# Fine-tuning stack -- same as the DS5002 final_project (train.py/benchmark.py)
+transformers
+peft
+trl
+bitsandbytes
+accelerate
+torch
+
+# Batched offline generation for the precompute job -- NOT the same tool as the
+# live follow-up path. See docs/architecture-evaluation.md critical finding.
+vllm
+
+# Live follow-up path: CPU-quantized, embedded in-process. See docs/tech-stack.md #5
+llama-cpp-python
+
+# Local embeddings for the retrieval layer -- zero cost, no cloud API. docs/tech-stack.md #7
+sentence-transformers
+
+# Riot API client
+requests
+httpx
+
+# Config / env
+python-dotenv
+pydantic-settings
+
+# Testing -- see docs/testing-strategy.md
+pytest
+pytest-asyncio
+httpx

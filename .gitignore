@@ -1,0 +1,55 @@
+# secrets
+.env
+*.pem
+*.key
+riot.txt
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# rust / tauri
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+
+# db / embedded postgres data
+backend/.pgdata/
+*.sqlite3
+
+# models / large artifacts (fine-tuned weights, GGUF quantized models)
+backend/app/llm/checkpoints/
+*.gguf
+*.safetensors
+*.bin
+
+# datasets pulled from Riot (do not commit raw match data)
+backend/app/data_pipeline/raw/
+backend/app/data_pipeline/cache/
+
+# logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# claude code
+.claude/
+
+# internal planning/decision docs, not for the public repo
+docs/decisions/
+docs/adr-001-architecture.md
+docs/architecture-evaluation.md
+docs/build-plan.md
+docs/system-design.md
+docs/tech-stack.md
+docs/testing-strategy.md
