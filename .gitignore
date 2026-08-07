@@ -2,7 +2,6 @@
 .env
 *.pem
 *.key
-riot.txt
 
 # python
 __pycache__/
