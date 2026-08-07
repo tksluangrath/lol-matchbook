@@ -1,3 +1,9 @@
+---
+noteId: "2a38c83091f711f1a408bdbca18563c4"
+tags: []
+
+---
+
 # lol-matchup-copilot
 
 A local, rank-aware League of Legends matchup assistant. Detects your champ-select pick/ban state automatically and gives instant early/mid/late-game matchup advice through a chat-style interface, backed by a small fine-tuned LLM plus a retrieval layer that stays current with the patch cycle without retraining.
@@ -52,4 +58,4 @@ Tauri setup (Phase 6) isn't scaffolded yet — see `desktop/README.md`.
 
 ## License
 
-Code in this repo: MIT (see `LICENSE`). This project uses Riot Games data under Riot's Developer API terms — it is not licensed, sponsored, or endorsed by Riot Games. League of Legends and Riot Games are trademarks of Riot Games, Inc.
+Code in this repo: Apache 2.0 (see `LICENSE`). This project uses Riot Games data under Riot's Developer API terms — it is not licensed, sponsored, or endorsed by Riot Games. League of Legends and Riot Games are trademarks of Riot Games, Inc.
