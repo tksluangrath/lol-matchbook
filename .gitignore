@@ -26,8 +26,12 @@ backend/.pgdata/
 
 # models / large artifacts (fine-tuned weights, GGUF quantized models)
 backend/app/llm/checkpoints/
+backend/app/finetune/artifacts/
 *.gguf
 *.safetensors
+
+# generated fine-tuning Q&A data (regenerate via app.finetune.qa_generation)
+backend/app/finetune/data/
 *.bin
 
 # datasets pulled from Riot (do not commit raw match data)
@@ -45,7 +49,6 @@ Thumbs.db
 .claude/
 
 # internal planning/decision docs, not for the public repo
-docs/decisions/
 docs/adr-001-architecture.md
 docs/architecture-evaluation.md
 docs/build-plan.md
