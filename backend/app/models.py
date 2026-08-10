@@ -1,24 +1,52 @@
 """
-SQLAlchemy models for the two core tables described in docs/system-design.md
-section 2 (Storage choices).
+SQLAlchemy models for the tables described in docs/system-design.md section 2
+(Storage choices), finalized per docs/decisions/phase0-role-scoping.md section 5
+and docs/decisions/tiered-fallback-design.md ("Schema implications").
 
-TODO(Phase 0): MatchupStat's (champ_a, champ_b) columns assume the role-scoping
-decision is resolved first -- if matchups are role-scoped, this table needs a
-`role` column and the uniqueness constraint changes accordingly.
+Role scoping: matchup identity includes `role` because a champion can be
+viable in more than one lane (phase0-role-scoping.md section 2, e.g. Ashe is
+both Bottom and Support) -- role is not a fixed attribute of a champion, it's
+part of what identifies a specific matchup row, alongside champ_a/champ_b/
+rank_bracket/phase. Same-lane pair scoping itself (which pairs get rows at
+all) is decided upstream in the data pipeline using the >10% role-viability
+threshold recommended in docs/decisions/phase1-role-threshold-sensitivity.md
+(phase1-role-pair-count.md's earlier >5% pass, 9,204 pairs, was superseded --
+10% -> 6,500 pairs is current). That threshold governs which rows the
+precompute pipeline generates, not this schema, but it's noted here per
+AGENT-7's assignment since role is now a first-class identity column.
+
+Tier/generated_at: per tiered-fallback-design.md's "Schema implications" --
+`advice` needs an eager|lazy tier marker and a generated_at timestamp for the
+promotion/staleness logic described there. Serving reads stay tier-agnostic;
+these columns exist for the refresh-cycle bookkeeping, not the request path.
+
+backfill_queue: per the same doc's "Serving a lazy-tier miss" section -- a
+lazy-tier cache miss never generates live; it's logged here and drained later
+by the CPU-quantized follow-up path, off the request's critical path.
 """
-from sqlalchemy import Column, Integer, String, Float, UniqueConstraint
+from datetime import datetime, timezone
+
+from sqlalchemy import CheckConstraint, Column, DateTime, Float, Integer, String, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
 
 class MatchupStat(Base):
-    """Aggregated win-rate data from the match-data pipeline (docs/build-plan.md Phase 1)."""
+    """Aggregated win-rate data from the match-data pipeline (docs/build-plan.md Phase 1).
+
+    Identity key: (champ_a, champ_b, role, rank_bracket, phase, patch). `role`
+    is the lane the matchup was played in (Match-V5 teamPosition, corrected --
+    see phase0-role-scoping.md section 2), not a static attribute of either
+    champion -- a champion can appear under more than one role across
+    different rows.
+    """
     __tablename__ = "matchup_stats"
 
     id = Column(Integer, primary_key=True)
     champ_a = Column(String, nullable=False)
     champ_b = Column(String, nullable=False)
+    role = Column(String, nullable=False)
     rank_bracket = Column(String, nullable=False)
     phase = Column(String, nullable=False)  # early | mid | late
     win_rate = Column(Float, nullable=False)
@@ -26,7 +54,7 @@ class MatchupStat(Base):
     patch = Column(String, nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("champ_a", "champ_b", "rank_bracket", "phase", "patch"),
+        UniqueConstraint("champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"),
     )
 
 
@@ -36,19 +64,46 @@ class Advice(Base):
     fact_source_id ties each blurb back to the MatchupStat row it was generated
     from -- the fact-grounding requirement from docs/system-design.md's
     Testing & Evaluation section.
+
+    tier: 'eager' (precomputed synchronously during /refresh) or 'lazy'
+    (generated on backfill after a cache-miss request), per
+    tiered-fallback-design.md. generated_at is used for the staleness check
+    that can re-enqueue an aging lazy row (same doc, "Refresh-cycle
+    interaction").
     """
     __tablename__ = "advice"
 
     id = Column(Integer, primary_key=True)
     champ_a = Column(String, nullable=False)
     champ_b = Column(String, nullable=False)
+    role = Column(String, nullable=False)
     rank_bracket = Column(String, nullable=False)
     phase = Column(String, nullable=False)
     text = Column(String, nullable=False)
     fact_source_id = Column(Integer, nullable=True)  # FK to MatchupStat.id
     patch = Column(String, nullable=False)
     is_abstention = Column(Integer, default=0)  # thin-data case, see architecture-evaluation.md
+    tier = Column(String, nullable=False)
+    generated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
-        UniqueConstraint("champ_a", "champ_b", "rank_bracket", "phase", "patch"),
+        UniqueConstraint("champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"),
+        CheckConstraint("tier IN ('eager', 'lazy')", name="ck_advice_tier"),
     )
+
+
+class BackfillQueue(Base):
+    """Lazy-tier cache-miss log, per tiered-fallback-design.md "Serving a lazy-
+    tier miss" -- a work queue, not stats or advice content, drained by a
+    background job using the CPU-quantized follow-up path, never live during
+    a request.
+    """
+    __tablename__ = "backfill_queue"
+
+    id = Column(Integer, primary_key=True)
+    champ_a = Column(String, nullable=False)
+    champ_b = Column(String, nullable=False)
+    rank_bracket = Column(String, nullable=False)
+    phase = Column(String, nullable=False)
+    requested_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    status = Column(String, nullable=False, default="pending")
