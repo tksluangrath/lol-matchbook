@@ -80,6 +80,23 @@ def stratified_sample(rows: list[dict], n_abstention: int, n_non_abstention: int
     return rng.sample(abstention_rows, n_abstention) + rng.sample(non_abstention_rows, n_non_abstention)
 
 
+def oversample_to_balance(abstention_rows: list[dict], non_abstention_rows: list[dict],
+                           seed: int) -> list[dict]:
+    """Keeps every abstention row unchanged and repeats the non-abstention
+    rows to reach an exact 50/50 count: full_repeats whole copies of
+    non_abstention_rows, plus a seeded sample of the remainder -- so every
+    real non-abstention row appears at least once before any repeats."""
+    n_abstention = len(abstention_rows)
+    n_non_abstention = len(non_abstention_rows)
+    full_repeats = n_abstention // n_non_abstention
+    remainder = n_abstention % n_non_abstention
+
+    oversampled_non_abstention = non_abstention_rows * full_repeats
+    oversampled_non_abstention += random.Random(seed).sample(non_abstention_rows, remainder)
+
+    return list(abstention_rows) + oversampled_non_abstention
+
+
 def build_dataset(rows: list[dict], tokenizer) -> Dataset:
     texts = []
     for r in rows:
@@ -93,12 +110,16 @@ def build_dataset(rows: list[dict], tokenizer) -> Dataset:
 
 
 def load_quantized_model():
+    """Same NF4 4-bit scheme on both backends; compute dtype/device_map
+    adapt to whatever hardware is actually present (CPU on the Apple
+    Silicon machine the smoke runs used, CUDA when a real GPU is present)."""
+    on_cuda = torch.cuda.is_available()
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float32,
+        bnb_4bit_compute_dtype=torch.bfloat16 if on_cuda else torch.float32,
     )
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME, quantization_config=bnb_config, device_map="cpu"
+        MODEL_NAME, quantization_config=bnb_config, device_map="auto" if on_cuda else "cpu"
     )
     return model
 
@@ -115,12 +136,17 @@ def build_peft_model(model):
     return get_peft_model(model, lora_config)
 
 
-def run_training(rows: list[dict] | None = None, output_dir: Path = OUTPUT_DIR) -> list[float]:
-    """Runs the smoke-scale QLoRA fine-tune. Returns the list of logged loss
-    values (one per LOG_EVERY-step logging interval). Defaults to the
-    original uniform-sample rows and OUTPUT_DIR; pass rows= to train on a
-    different sample (e.g. stratified_sample's output) and output_dir= to
-    save elsewhere without touching the default artifact path."""
+def run_training(rows: list[dict] | None = None, output_dir: Path = OUTPUT_DIR,
+                  per_device_train_batch_size: int = 2, gradient_accumulation_steps: int = 1,
+                  max_steps: int = MAX_STEPS, num_train_epochs: float | None = None,
+                  max_length: int = 512, optim: str = "adamw_torch",
+                  save: bool = True) -> tuple[list[float], object]:
+    """Runs a QLoRA fine-tune. Returns (logged loss values, trainer). Defaults
+    match the original smoke-scale run (uniform-sample rows, OUTPUT_DIR,
+    batch size 2, MAX_STEPS). Pass rows= for a different sample (e.g.
+    oversample_to_balance's output), num_train_epochs= to train by epoch
+    count instead of max_steps (max_steps=-1 must be passed alongside it),
+    and save=False to skip writing the adapter (e.g. for a short benchmark)."""
     if rows is None:
         rows = load_sampled_examples()
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -129,17 +155,22 @@ def run_training(rows: list[dict] | None = None, output_dir: Path = OUTPUT_DIR) 
     model = load_quantized_model()
     model = build_peft_model(model)
 
+    on_cuda = torch.cuda.is_available()
+    extra_args = {"num_train_epochs": num_train_epochs} if num_train_epochs is not None else {}
     sft_config = SFTConfig(
         output_dir=str(output_dir),
-        per_device_train_batch_size=2,
-        max_steps=MAX_STEPS,
+        per_device_train_batch_size=per_device_train_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        max_steps=max_steps,
         logging_steps=LOG_EVERY,
+        **extra_args,
         learning_rate=2e-4,
-        max_length=512,
+        max_length=max_length,
+        optim=optim,
         report_to="none",
-        gradient_checkpointing=False,
+        gradient_checkpointing=on_cuda,
         seed=SAMPLE_SEED,
-        bf16=False,
+        bf16=on_cuda,
         fp16=False,
     )
 
@@ -151,13 +182,14 @@ def run_training(rows: list[dict] | None = None, output_dir: Path = OUTPUT_DIR) 
     )
     trainer.train()
 
-    trainer.save_model(str(output_dir))
-    tokenizer.save_pretrained(str(output_dir))
+    if save:
+        trainer.save_model(str(output_dir))
+        tokenizer.save_pretrained(str(output_dir))
 
     losses = [entry["loss"] for entry in trainer.state.log_history if "loss" in entry]
-    return losses
+    return losses, trainer
 
 
 if __name__ == "__main__":
-    logged_losses = run_training()
+    logged_losses, _ = run_training()
     print("Logged losses:", logged_losses)

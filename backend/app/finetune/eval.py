@@ -55,14 +55,16 @@ hidden) -- it is a real similarity bar, not "contains any hedge-ish word".
 import difflib
 import json
 import re
+import shutil
+import tempfile
 from pathlib import Path
 
 import torch
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoTokenizer
 
 from app.finetune.qa_generation import HEDGE_PHRASE
-from app.finetune.train import MODEL_NAME, OUTPUT_DIR, SYSTEM_PROMPT
+from app.finetune.train import MODEL_NAME, OUTPUT_DIR, SYSTEM_PROMPT, load_quantized_model
 
 DATA_DIR = Path(__file__).parent / "data"
 HELDOUT_PATH = DATA_DIR / "heldout.jsonl"
@@ -87,17 +89,24 @@ def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def load_model_and_tokenizer() -> tuple[PeftModel, "AutoTokenizer"]:
-    """Loads the base model 4-bit quantized, same real bnb path train.py used
-    for training (see module docstring), then wraps it with AGENT-12's saved
-    adapter. A single model instance is used for both base and adapted
-    generation via disable_adapter()."""
-    bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.float32)
-    base = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME, quantization_config=bnb_config, device_map="cpu"
-    )
+def load_model_and_tokenizer(adapter_dir: Path = OUTPUT_DIR) -> tuple[PeftModel, "AutoTokenizer"]:
+    """Loads the base model 4-bit quantized via train.load_quantized_model
+    (same real bnb path train.py used for training, reused not
+    reimplemented -- CPU on machines with no CUDA, GPU otherwise), then
+    wraps it with the saved adapter at adapter_dir. A single model instance
+    is used for both base and adapted generation via disable_adapter().
+
+    The adapter is copied to a local temp dir before loading: safetensors
+    memory-maps the file, which crashes (fatal signal inside
+    safetensors.torch.load_file) when the file lives in a OneDrive-synced
+    folder on Windows -- confirmed by reproducing the crash against the
+    repo path and the fix against a local copy."""
+    base = load_quantized_model()
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = PeftModel.from_pretrained(base, str(OUTPUT_DIR))
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        local_adapter_dir = Path(tmp_dir) / "adapter"
+        shutil.copytree(adapter_dir, local_adapter_dir)
+        model = PeftModel.from_pretrained(base, str(local_adapter_dir))
     model.eval()
     return model, tokenizer
 
@@ -108,7 +117,7 @@ def generate(model: PeftModel, tokenizer, prompt: str, max_new_tokens: int) -> s
         {"role": "user", "content": prompt},
     ]
     text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = tokenizer(text, return_tensors="pt")
+    inputs = tokenizer(text, return_tensors="pt").to(model.device)
     with torch.no_grad():
         out = model.generate(
             **inputs,
@@ -255,15 +264,20 @@ def step4_abstention_eval(model: PeftModel, tokenizer, rows: list[dict]) -> dict
             "pass_rate": passed / len(results) if results else None, "rows": results}
 
 
-def run_all() -> dict:
-    model, tokenizer = load_model_and_tokenizer()
+def run_all(adapter_dir: Path = OUTPUT_DIR, results_path: Path = RESULTS_PATH,
+            caveat: str = (
+                "AGENT-12's adapter is a SMOKE-SCALE run (<=500 training examples, "
+                "<=200 steps). These results demonstrate the eval harness is correct "
+                "and runs for real -- they are not a verdict on model quality."
+            )) -> dict:
+    model, tokenizer = load_model_and_tokenizer(adapter_dir)
 
     step1 = step1_sanity_check(model, tokenizer)
     if not step1["passed"]:
         summary = {"step1_sanity_check": step1, "blocked": True,
                     "reason": "step 1 base-vs-finetuned check failed -- steps 2-4 not run"}
-        RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        RESULTS_PATH.write_text(json.dumps(summary, indent=2))
+        results_path.parent.mkdir(parents=True, exist_ok=True)
+        results_path.write_text(json.dumps(summary, indent=2))
         return summary
 
     heldout_rows = load_jsonl(HELDOUT_PATH)
@@ -275,11 +289,7 @@ def run_all() -> dict:
     step4 = step4_abstention_eval(model, tokenizer, abstention_rows)
 
     summary = {
-        "smoke_scale_caveat": (
-            "AGENT-12's adapter is a SMOKE-SCALE run (<=500 training examples, "
-            "<=200 steps). These results demonstrate the eval harness is correct "
-            "and runs for real -- they are not a verdict on model quality."
-        ),
+        "smoke_scale_caveat": caveat,
         "step1_sanity_check": step1,
         "step2_heldout_eval": {"total": step2["total"], "passed": step2["passed"], "pass_rate": step2["pass_rate"]},
         "step2_rows": step2["rows"],
@@ -288,8 +298,8 @@ def run_all() -> dict:
         "step4_rows": step4["rows"],
         "blocked": False,
     }
-    RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    RESULTS_PATH.write_text(json.dumps(summary, indent=2))
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    results_path.write_text(json.dumps(summary, indent=2))
     return summary
 
 
