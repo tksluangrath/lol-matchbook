@@ -143,6 +143,55 @@ def generate_qa_rows(rows: list[dict], seed: int = TEMPLATE_SEED) -> list[dict]:
     return [_format_qa(row, rng) for row in rows]
 
 
+def build_context_conditioned_row(row: dict, qa_row: dict) -> dict:
+    """Prepends a context block (real sample_size + win_rate, unconditionally,
+    even for abstention rows) to qa_row's prompt. response is untouched."""
+    game_word = "game" if row["sample_size"] == 1 else "games"
+    win_rate_pct = round(row["win_rate"] * 100)
+    context = (
+        f"Context: {row['sample_size']} {game_word} observed this patch between "
+        f"{row['champ_a']} and {row['champ_b']} in the {row['role']} lane. "
+        f"{row['champ_a']} win rate: {win_rate_pct}%.\n"
+        f"Question: {qa_row['prompt']}"
+    )
+    return {**qa_row, "prompt": context}
+
+
+def build_and_write_all_context(csv_path: str, out_dir: Path) -> dict:
+    """Same real pipeline/split/order as build_and_write_all, so
+    generate_qa_rows draws the same RNG sequence and produces byte-identical
+    prompt/response text before context is prepended -- only the prompt
+    gains a context block, response and the held-out pair set are unchanged."""
+    matches = load_hf_csv_matches(csv_path)
+    valid = filter_valid_matches(matches)
+    rows = aggregate_matchup_stats(valid)
+    threshold = abstention_threshold(rows)
+    train_rows, heldout_rows = split_rows(rows)
+    for row in train_rows + heldout_rows:
+        row["is_abstention"] = row["sample_size"] <= threshold
+
+    train_non_abstention = [r for r in train_rows if not r["is_abstention"]]
+    train_abstention = [r for r in train_rows if r["is_abstention"]]
+    heldout_non_abstention = [r for r in heldout_rows if not r["is_abstention"]]
+    heldout_abstention = [r for r in heldout_rows if r["is_abstention"]]
+
+    def context_rows(raw_rows: list[dict]) -> list[dict]:
+        qa_rows = generate_qa_rows(raw_rows)
+        return [build_context_conditioned_row(r, qa) for r, qa in zip(raw_rows, qa_rows)]
+
+    train_ctx = context_rows(train_non_abstention + train_abstention)
+    heldout_ctx = context_rows(heldout_non_abstention)
+    abstention_ctx = context_rows(heldout_abstention)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write_jsonl(out_dir / "train_context.jsonl", train_ctx)
+    _write_jsonl(out_dir / "heldout_context.jsonl", heldout_ctx)
+    _write_jsonl(out_dir / "abstention_eval_context.jsonl", abstention_ctx)
+
+    return {"train_rows": len(train_ctx), "heldout_rows": len(heldout_ctx),
+            "abstention_rows": len(abstention_ctx)}
+
+
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         for row in rows:

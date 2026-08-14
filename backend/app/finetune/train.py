@@ -80,20 +80,26 @@ def stratified_sample(rows: list[dict], n_abstention: int, n_non_abstention: int
     return rng.sample(abstention_rows, n_abstention) + rng.sample(non_abstention_rows, n_non_abstention)
 
 
+def oversample_to_count(rows: list[dict], target_count: int, seed: int) -> list[dict]:
+    """Repeats rows to reach exactly target_count: full_repeats whole
+    copies of rows, plus a seeded sample of the remainder (without
+    replacement) -- so every real row appears at least once before any
+    repeats. target_count must be >= len(rows)."""
+    n = len(rows)
+    full_repeats = target_count // n
+    remainder = target_count % n
+
+    oversampled = rows * full_repeats
+    if remainder:
+        oversampled += random.Random(seed).sample(rows, remainder)
+    return oversampled
+
+
 def oversample_to_balance(abstention_rows: list[dict], non_abstention_rows: list[dict],
                            seed: int) -> list[dict]:
     """Keeps every abstention row unchanged and repeats the non-abstention
-    rows to reach an exact 50/50 count: full_repeats whole copies of
-    non_abstention_rows, plus a seeded sample of the remainder -- so every
-    real non-abstention row appears at least once before any repeats."""
-    n_abstention = len(abstention_rows)
-    n_non_abstention = len(non_abstention_rows)
-    full_repeats = n_abstention // n_non_abstention
-    remainder = n_abstention % n_non_abstention
-
-    oversampled_non_abstention = non_abstention_rows * full_repeats
-    oversampled_non_abstention += random.Random(seed).sample(non_abstention_rows, remainder)
-
+    rows to reach an exact 50/50 count via oversample_to_count."""
+    oversampled_non_abstention = oversample_to_count(non_abstention_rows, len(abstention_rows), seed)
     return list(abstention_rows) + oversampled_non_abstention
 
 
