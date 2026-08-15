@@ -111,7 +111,7 @@ def load_model_and_tokenizer(adapter_dir: Path = OUTPUT_DIR) -> tuple[PeftModel,
     return model, tokenizer
 
 
-def generate(model: PeftModel, tokenizer, prompt: str, max_new_tokens: int) -> str:
+def generate(model: PeftModel, tokenizer, prompt: str, max_new_tokens: int, **gen_kwargs) -> str:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": prompt},
@@ -124,6 +124,7 @@ def generate(model: PeftModel, tokenizer, prompt: str, max_new_tokens: int) -> s
             max_new_tokens=max_new_tokens,
             do_sample=False,
             pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+            **gen_kwargs,
         )
     gen_tokens = out[0][inputs["input_ids"].shape[1]:]
     return tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
