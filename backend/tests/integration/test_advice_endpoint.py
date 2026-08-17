@@ -54,6 +54,21 @@ def seeded_app_server():
                 index_elements=["champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"]
             )
         )
+    # Two real rows for the same champ_a/champ_b/rank but different roles
+    # (idempotent, same reasoning as above) -- proves the role query param
+    # actually disambiguates rather than just being accepted and ignored.
+    session = TestSession()
+    for role, text_prefix in (("bottom", "BOT-LANE-TEXT"), ("support", "SUPPORT-TEXT")):
+        for phase in ("early", "mid", "late"):
+            session.execute(
+                pg_insert(Advice).values(
+                    champ_a="MultiRole", champ_b="Opponent", role=role, rank_bracket="gold",
+                    phase=phase, text=f"{text_prefix}-{phase}", fact_source_id=None, patch=PATCH,
+                    is_abstention=0, tier="eager",
+                ).on_conflict_do_nothing(
+                    index_elements=["champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"]
+                )
+            )
     session.commit()
     session.close()
 
@@ -96,7 +111,7 @@ def test_advice_endpoint_returns_real_precomputed_data_for_seeded_pair(seeded_ap
     pair = seeded_app_server["written_pairs"][0]
     resp = httpx.get(
         f"{seeded_app_server['base_url']}/advice",
-        params={"champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "rank": pair["rank_bracket"]},
+        params={"champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "role": pair["role"], "rank": pair["rank_bracket"]},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -108,7 +123,7 @@ def test_advice_endpoint_returns_real_precomputed_data_for_seeded_pair(seeded_ap
 def test_advice_endpoint_returns_404_for_never_precomputed_pair(seeded_app_server):
     resp = httpx.get(
         f"{seeded_app_server['base_url']}/advice",
-        params={"champ_a": "NotAChamp", "champ_b": "AlsoNotAChamp", "rank": "iron"},
+        params={"champ_a": "NotAChamp", "champ_b": "AlsoNotAChamp", "role": "top", "rank": "iron"},
     )
     assert resp.status_code == 404
     assert resp.json()["status"] == "not_precomputed"
@@ -117,10 +132,33 @@ def test_advice_endpoint_returns_404_for_never_precomputed_pair(seeded_app_serve
 def test_advice_endpoint_returns_abstention_status_for_thin_data_row(seeded_app_server):
     resp = httpx.get(
         f"{seeded_app_server['base_url']}/advice",
-        params={"champ_a": "ThinData", "champ_b": "Opponent", "rank": "iron"},
+        params={"champ_a": "ThinData", "champ_b": "Opponent", "role": "top", "rank": "iron"},
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "abstention"
+
+
+def test_advice_endpoint_disambiguates_by_role_for_same_champ_pair_and_rank(seeded_app_server):
+    # MultiRole/Opponent at rank=gold has real rows for both role=bottom and
+    # role=support (seeded in the fixture) -- confirms `role` actually
+    # selects the right row set instead of being accepted and ignored.
+    resp_bottom = httpx.get(
+        f"{seeded_app_server['base_url']}/advice",
+        params={"champ_a": "MultiRole", "champ_b": "Opponent", "role": "bottom", "rank": "gold"},
+    )
+    resp_support = httpx.get(
+        f"{seeded_app_server['base_url']}/advice",
+        params={"champ_a": "MultiRole", "champ_b": "Opponent", "role": "support", "rank": "gold"},
+    )
+    assert resp_bottom.status_code == 200
+    assert resp_support.status_code == 200
+    assert resp_bottom.json() == {
+        "early": "BOT-LANE-TEXT-early", "mid": "BOT-LANE-TEXT-mid", "late": "BOT-LANE-TEXT-late",
+    }
+    assert resp_support.json() == {
+        "early": "SUPPORT-TEXT-early", "mid": "SUPPORT-TEXT-mid", "late": "SUPPORT-TEXT-late",
+    }
+    assert resp_bottom.json() != resp_support.json()
 
 
 def test_advice_endpoint_source_imports_no_model_or_generation_code():
@@ -142,7 +180,7 @@ def test_advice_endpoint_source_imports_no_model_or_generation_code():
 
 def test_advice_endpoint_real_request_latency_under_200ms(seeded_app_server):
     pair = seeded_app_server["written_pairs"][0]
-    params = {"champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "rank": pair["rank_bracket"]}
+    params = {"champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "role": pair["role"], "rank": pair["rank_bracket"]}
 
     # One warmup request (connection setup, first-request overhead), then
     # measure 10 real HTTP round trips.

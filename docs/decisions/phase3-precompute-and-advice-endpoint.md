@@ -48,13 +48,13 @@ the pipeline across two processes for an incidental environment gap.
    declares, plus a pre-generation existence check so a rerun skips real
    model calls entirely for pairs already written.
 3. **`GET /advice`'s declared query contract (`champ_a`, `champ_b`, `rank`)
-   doesn't include `role`**, even though `role` is part of Advice's real
-   uniqueness. Kept the endpoint's existing declared contract rather than
-   silently expanding it — for a champion played in multiple roles (e.g.
-   Ashe bot/support, per `models.py`'s own docstring) this would be a real
-   ambiguity. Doesn't surface for this session's 10-pair sample (no
-   champ_a/champ_b pair repeats across roles in it), but is a real gap for
-   later.
+   didn't include `role`**, even though `role` is part of Advice's real
+   uniqueness. Fixed in a follow-up pass: `role` is now a required query
+   param, matching the schema's real identity. Verified with a real test
+   (`test_advice_endpoint_disambiguates_by_role_for_same_champ_pair_and_rank`):
+   two real rows seeded for the same champ_a/champ_b/rank but different
+   roles (bottom vs. support) return distinct, correct text per role, not
+   whichever sorted first.
 
 ## Precompute: 10/10 real matchups, 0 skipped
 
@@ -159,8 +159,9 @@ consistent with zero model/GPU involvement in the request path.
 
 Not done in this slice (explicitly out of scope): full role-scoped
 production precompute (~6,500 pairs, per phase1-role-threshold-
-sensitivity.md), the `role` query-param gap on `/advice`, and `/ask`
-(the live follow-up path) — untouched, still `raise NotImplementedError`.
+sensitivity.md) and `/ask` (the live follow-up path) — untouched, still
+`raise NotImplementedError`. The `role` query-param gap on `/advice` was
+closed in a follow-up pass (see the discrepancies section above).
 
 ## Files
 
