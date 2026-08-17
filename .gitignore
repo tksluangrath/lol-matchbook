@@ -20,8 +20,10 @@ dist/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
 
-# db / embedded postgres data
-backend/.pgdata/
+# db / embedded postgres data -- DEFAULT_PGDATA in backend/app/db_migrate.py
+# resolves to the repo root (../.. from backend/app/), not backend/, so the
+# ignore rule needs to match there too.
+.pgdata/
 *.sqlite3
 
 # models / large artifacts (fine-tuned weights, GGUF quantized models)
