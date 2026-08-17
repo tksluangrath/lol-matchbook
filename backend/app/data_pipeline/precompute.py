@@ -43,8 +43,10 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.data_pipeline.aggregate import aggregate_matchup_stats, filter_valid_matches
+from app.data_pipeline.riot_client import load_hf_csv_matches
 from app.finetune.eval import generate, load_model_and_tokenizer
-from app.finetune.qualitative_advice import fact_grounding_check
+from app.finetune.qualitative_advice import champion_text, fact_grounding_check, fetch_champion_detail
 from app.models import Advice, MatchupStat
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "finetune" / "data"
@@ -54,6 +56,13 @@ DEFAULT_ADAPTER_DIR = (
     Path(__file__).resolve().parents[1] / "finetune" / "artifacts" / "smoke-adapter-qualitative-dedicated-v2"
 )
 MAX_NEW_TOKENS = 400
+
+# Real cached HF dataset CSV path -- same source phase1-role-pair-count.md
+# and every prior real aggregation run this project used, not re-downloaded.
+DEFAULT_MATCH_CSV = (
+    "/Users/terrance/.cache/huggingface/hub/datasets--BoostedJonP--league_of_legends_match_data/"
+    "snapshots/00aa8cff89383127ff6a2d7d26a6b01fcef80c04/league_of_legends_emerald_match_data.csv"
+)
 
 CONTEXT_RE = re.compile(r"Context: (\d+) games? observed this patch between .+ win rate: (\d+)%")
 
@@ -93,6 +102,46 @@ def load_sample_pairs(n: int = 10) -> list[dict]:
             "win_rate": win_rate_pct / 100, "generation_prompt": row["context"],
         })
     return pairs
+
+
+def rank_real_candidate_pairs(csv_path: str = DEFAULT_MATCH_CSV) -> list[dict]:
+    """Runs the real aggregation pipeline (app.data_pipeline.riot_client +
+    aggregate, unmodified) against the real cached match CSV and returns
+    every real (champ_a, champ_b, role) row with real match data behind it,
+    sorted by sample_size (observed game count, a play-volume proxy)
+    descending. This is the real, data-backed candidate pool -- not the
+    6,512 theoretical same-lane-role-pairing ceiling, which counts pairs
+    that are *allowed* to exist, not ones anyone actually played."""
+    matches = load_hf_csv_matches(csv_path)
+    valid = filter_valid_matches(matches)
+    rows = aggregate_matchup_stats(valid)
+    rows.sort(key=lambda r: r["sample_size"], reverse=True)
+    return rows
+
+
+def build_pair_with_context(stat_row: dict) -> dict:
+    """Fetches real Data Dragon kit text for both champions (2 real
+    requests) and builds the same generation_prompt shape
+    run_precompute_batch expects, from a real aggregate_matchup_stats row.
+    Real network calls -- only call this for pairs actually selected for
+    precompute, not the whole candidate pool."""
+    champ_a_detail = fetch_champion_detail(stat_row["champ_a"])
+    champ_b_detail = fetch_champion_detail(stat_row["champ_b"])
+    game_word = "game" if stat_row["sample_size"] == 1 else "games"
+    win_rate_pct = round(stat_row["win_rate"] * 100)
+    context_block = (
+        f"Context: {stat_row['sample_size']} {game_word} observed this patch between "
+        f"{stat_row['champ_a']} and {stat_row['champ_b']} in the {stat_row['role']} lane. "
+        f"{stat_row['champ_a']} win rate: {win_rate_pct}%."
+    )
+    champ_a_kit = f"{stat_row['champ_a']} kit: {champion_text(champ_a_detail)}"
+    champ_b_kit = f"{stat_row['champ_b']} kit: {champion_text(champ_b_detail)}"
+    return {
+        "champ_a": stat_row["champ_a"], "champ_b": stat_row["champ_b"], "role": stat_row["role"],
+        "rank_bracket": stat_row["rank"], "sample_size": stat_row["sample_size"],
+        "win_rate": stat_row["win_rate"],
+        "generation_prompt": f"{context_block}\n{champ_a_kit}\n{champ_b_kit}",
+    }
 
 
 def split_into_sections(text: str) -> dict[str, str] | None:

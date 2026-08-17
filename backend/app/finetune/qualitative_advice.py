@@ -16,6 +16,7 @@ of the filter function): any capitalized 2-4-word phrase in the generated
 blurb must appear verbatim in the supplied kit-context text, and any cited
 percentage must match the pair's real win rate.
 """
+import functools
 import re
 
 import requests
@@ -25,7 +26,29 @@ from app.retrieval.index import champion_text
 DDRAGON_DETAIL_URL = (
     "https://ddragon.leagueoflegends.com/cdn/{patch}/data/en_US/champion/{champ}.json"
 )
+DDRAGON_CHAMPION_LIST_URL = "https://ddragon.leagueoflegends.com/cdn/{patch}/data/en_US/champion.json"
 PATCH = "16.15.1"
+
+
+@functools.lru_cache(maxsize=8)
+def _real_champion_keys(patch: str) -> dict[str, str]:
+    """{lowercased key: real key}, fetched once per patch. Real gap found
+    running the eager-tier precompute against real match data: Riot's
+    Match-V5 championName field spells some champions differently than Data
+    Dragon's own key (e.g. match data "FiddleSticks" vs. the real Data
+    Dragon key "Fiddlesticks") -- verified no lowercase collisions across
+    all 233 real champion.json keys, so a case-insensitive resolve is safe."""
+    resp = requests.get(DDRAGON_CHAMPION_LIST_URL.format(patch=patch), timeout=15)
+    resp.raise_for_status()
+    return {k.lower(): k for k in resp.json()["data"]}
+
+
+def resolve_champ_key(champ_key: str, patch: str = PATCH) -> str:
+    """The real Data Dragon key for champ_key, case-insensitive. Falls back
+    to champ_key unchanged if it's not a recognized champion at all (lets
+    the caller's own real fetch 404/403 rather than silently swallowing a
+    genuinely unknown name)."""
+    return _real_champion_keys(patch).get(champ_key.lower(), champ_key)
 
 CAPITALIZED_PHRASE_RE = re.compile(r"\b[A-Z][a-zA-Z']*(?:\s+[A-Z][a-zA-Z']*){1,3}\b")
 PCT_RE = re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")
@@ -57,9 +80,10 @@ def select_pairs(rows: list[dict], n: int) -> list[dict]:
 
 
 def fetch_champion_detail(champ_key: str, patch: str = PATCH) -> dict:
-    resp = requests.get(DDRAGON_DETAIL_URL.format(patch=patch, champ=champ_key), timeout=15)
+    real_key = resolve_champ_key(champ_key, patch)
+    resp = requests.get(DDRAGON_DETAIL_URL.format(patch=patch, champ=real_key), timeout=15)
     resp.raise_for_status()
-    return resp.json()["data"][champ_key]
+    return resp.json()["data"][real_key]
 
 
 def win_rate_context_block(row: dict) -> str:
