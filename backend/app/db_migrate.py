@@ -23,8 +23,11 @@ from sqlalchemy.engine import Engine
 from app.models import Base
 
 # ponytail: repo-relative default so `python -m app.db_migrate` works out of
-# the box; override via the pgdata= argument (e.g. a temp dir in tests).
-DEFAULT_PGDATA = os.path.join(
+# the box; override via the pgdata= argument (e.g. a temp dir in tests), or
+# the PGDATA env var (set by Dockerfile to /app/.pgdata -- the repo-relative
+# "../.." path resolves outside /app inside the container, which the
+# non-root app user can't write to; real PermissionError caught by CI).
+DEFAULT_PGDATA = os.environ.get("PGDATA") or os.path.join(
     os.path.dirname(__file__), "..", "..", ".pgdata"
 )
 

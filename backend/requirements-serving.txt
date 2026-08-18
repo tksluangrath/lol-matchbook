@@ -12,18 +12,19 @@ uvicorn[standard]
 websockets
 
 # DB -- Postgres + pgvector via embedded pgserver, see docs/tech-stack.md #4.
-# Every DB URL in this codebase is a plain postgresql:// (pgserver's own
-# get_uri(), never +psycopg) -- SQLAlchemy's default dialect for that scheme
-# is psycopg2, not psycopg3, confirmed via
-# sqlalchemy.dialects.registry.load('postgresql'). psycopg2-binary is the
-# real driver actually used; psycopg[binary] (v3) was listed here but never
-# imported anywhere in app/, a real CI-only gap the local dev env masked
-# (psycopg2-binary happened to already be installed there from before the
-# serving/training requirements split).
+# Both real drivers are genuinely needed, not redundant: most of this
+# codebase uses a plain postgresql:// URL (pgserver's own get_uri()), which
+# SQLAlchemy's default dialect resolves to psycopg2 -- but
+# tests/unit/test_models.py explicitly builds a postgresql+psycopg:// URL
+# (psycopg v3). An earlier pass here dropped psycopg[binary] on the
+# (incorrect -- only app/ was grepped, not tests/) assumption it was unused;
+# real CI caught the resulting ModuleNotFoundError: No module named
+# 'psycopg' in test_models.py once psycopg2-binary's own gap was fixed.
 pgserver
 sqlalchemy
 pgvector
 psycopg2-binary
+psycopg[binary]
 
 # Live follow-up path: CPU-quantized, embedded in-process. See docs/tech-stack.md #5
 llama-cpp-python
