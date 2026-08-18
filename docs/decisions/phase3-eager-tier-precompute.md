@@ -6,9 +6,10 @@ tags: []
 
 # Phase 3: Eager-Tier Scale-Up — Real Candidate Pool, Real Throughput, Real N
 
-**Status: IN PROGRESS.** Real numbers measured, real top-109 run launched
-detached. This doc will be updated with final written/skipped counts once
-the ~8-hour run completes.
+**Status: DONE.** Real top-109 run completed: **82 written, 27 skipped, 0
+errors**, 7h57m35s (essentially exact to the 7h59m projection).
+Idempotency confirmed on a real rerun. Skip reasons investigated for
+real, not left as a bare number.
 
 ## The formula, corrected for how the system actually works
 
@@ -144,29 +145,82 @@ yet when it crashed (died during context-building, before
 relaunched clean.
 
 Second launch (PID 23332): context-building succeeded (all 218 real
-fetches), model loaded, generation running. Persistent monitor watching
-for completion.
+fetches), model loaded, generation ran for real to completion.
 
-**[Placeholder — updated when the run completes]:**
+### Real result
 
 ```
-written=?  skipped=?  already_present=?
-wall_clock_s=?
+written=82  skipped=27  already_present=0
+wall_clock_s=28655.0  (7h57m35s -- matches the 7h59m projection almost exactly)
 ```
 
-## Idempotency
+### 27 skipped: investigated for real, not left as a bare number
+
+24 of the 27 skipped pairs are bottom-lane (ADC) or utility (support)
+matchups — including Milio/Nami, the single highest-ranked pair in the
+entire candidate pool (20 real observed games). Only 2 jungle pairs and 0
+top/middle pairs are among the skips. Struck by that concentration,
+re-ran 3 representative pairs (Milio/Nami, Jhin/Kaisa, Kayn/Warwick — same
+deterministic generation, real cost ~15 min) specifically to capture the
+real skip reason rather than assume:
+
+```
+Milio/Nami:  reason=grounding_failed  invented_phrases=['Fire Bounce']
+Jhin/Kaisa:  reason=grounding_failed  invented_phrases=['Dead Ally']
+Kayn/Warwick: reason=grounding_failed  invented_phrases=['Primal Howls']
+```
+
+All 3 failed for the same real reason, on a genuinely hallucinated ability
+name each time (none of these three phrases exist in the real supplied
+kit text) — this is the grounding check correctly catching real fabricated
+content, not the kind of regex false-positive bug found earlier this
+session (the sentence-initial-word bug in `phase2-qualitative-advice-
+diagnostic.md`). Not investigated further why bot-lane/support pairs
+hallucinate more often than the top-lane/mid-lane pairs the original
+10-pair slice used (plausibly: ADC/support kits tend to have more,
+more mechanically-named abilities — more surface area to misremember a
+specific name under) — a real, open question, not resolved here.
+
+**Incidental real finding, unrelated to the grounding failures:**
+Kayn/Warwick's real generated output contains raw Data Dragon HTML markup
+leaked verbatim (`<font color='#8484fb'>Shadow Assassin</font>`) — kit
+text retrieval (`champion_text()`) doesn't currently strip Data Dragon's
+embedded color-tag markup from ability descriptions before it reaches the
+model. Not the cause of this pair's grounding failure (the flagged phrase
+was `'Primal Howls'`, unrelated to the font tags), but a real, separate
+data-quality gap worth fixing before any of this content is user-facing.
+
+## Idempotency: confirmed real, not assumed
 
 Reuses `run_precompute_batch`'s existing pre-generation existence check
-and `ON CONFLICT DO NOTHING` writes, unmodified — the same idempotency
-behavior already proven real in
-`docs/decisions/phase3-precompute-and-advice-endpoint.md`'s rerun test.
-**[Placeholder — a rerun check against the completed top-109 run will be
-added here once it finishes.]**
+and `ON CONFLICT DO NOTHING` writes, unmodified. Real rerun against all 92
+pairs the persistent DB has at this patch (the 82 from this run + the
+original 10-pair slice):
+
+```
+written: 0   already_present: 92   skipped: 0
+```
+
+Note: this idempotency guarantee only covers pairs that were actually
+*written*. The 27 skipped pairs have no persisted record of the attempt
+(skipped pairs are never written anywhere), so every rerun will always
+retry real generation for them — correct behavior for "keep trying
+previously-failed pairs," but real cost to be aware of before including
+the skipped set in a future rerun (confirmed the hard way: an earlier,
+overly broad idempotency check accidentally included all 109 pairs instead
+of just the 82 written ones and kicked off an unintended ~2-hour
+regeneration of the 27 skips before being caught and killed).
 
 ## Next step
 
 Not done in this slice (explicitly out of scope, per this task): `/ask`
-(the live follow-up path) and GGUF conversion — both untouched.
+(the live follow-up path) and GGUF conversion — both untouched. Two real
+gaps found and left for later, deliberately not fixed here since they were
+discovered late in this task's own investigation, not part of its
+requested scope: stripping Data Dragon HTML markup from kit text before it
+reaches the model, and deciding whether/how to retry the 27 skipped pairs
+(e.g. a bounded retry count before giving up, or accepting they fall to
+the lazy-tier fallback permanently).
 
 ## Files
 
