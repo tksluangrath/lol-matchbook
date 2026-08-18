@@ -102,12 +102,42 @@ def real_win_rate_pct(row: dict) -> int:
     return int(m.group(1))
 
 
+def ability_names(champ_detail: dict) -> list[str]:
+    """Real passive + spell names (verbatim, kit order) from a Data Dragon
+    champion detail dict -- the same dict champion_text() already reads its
+    prose from, no new fetch."""
+    names = []
+    passive = champ_detail.get("passive")
+    if passive and passive.get("name"):
+        names.append(passive["name"])
+    for spell in champ_detail.get("spells", []):
+        if spell.get("name"):
+            names.append(spell["name"])
+    return names
+
+
+def ability_whitelist_block(champ_a: str, champ_a_detail: dict, champ_b: str, champ_b_detail: dict) -> str:
+    """Explicit, exact-spelling ability-name list for both champions.
+    Real gap found investigating the 27 eager-tier grounding-check skips
+    (docs/decisions/phase3-eager-tier-precompute.md): ability names only
+    ever appeared inside prose kit-text, never as an anchor the model could
+    copy verbatim -- e.g. Warwick's real "Primal Howl" came out as "Primal
+    Howls", Viego's real "Harrowed Path" came out as "Hallowed Path"."""
+    a_names = ", ".join(ability_names(champ_a_detail))
+    b_names = ", ".join(ability_names(champ_b_detail))
+    return (
+        f"{champ_a}'s real abilities: {a_names}. {champ_b}'s real abilities: {b_names}. "
+        "Only reference ability names from these two lists, spelled exactly as given."
+    )
+
+
 def build_generation_prompt(row: dict, champ_a_detail: dict, champ_b_detail: dict) -> str:
     win_rate_ctx = win_rate_context_block(row)
     champ_a_kit = f"{row['champ_a']} kit: {champion_text(champ_a_detail)}"
     champ_b_kit = f"{row['champ_b']} kit: {champion_text(champ_b_detail)}"
+    whitelist = ability_whitelist_block(row["champ_a"], champ_a_detail, row["champ_b"], champ_b_detail)
     return (
-        f"{win_rate_ctx}\n{champ_a_kit}\n{champ_b_kit}\n"
+        f"{win_rate_ctx}\n{champ_a_kit}\n{champ_b_kit}\n{whitelist}\n"
         "Instruction: Using only the facts given above, write strategic "
         f"{row['role']}-lane matchup advice in exactly three labeled "
         "sections: Early:, Mid:, Late:. Do not cite any ability, item, or "

@@ -39,14 +39,19 @@ import json
 import re
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.data_pipeline.aggregate import aggregate_matchup_stats, filter_valid_matches
 from app.data_pipeline.riot_client import load_hf_csv_matches
 from app.finetune.eval import generate, load_model_and_tokenizer
-from app.finetune.qualitative_advice import champion_text, fact_grounding_check, fetch_champion_detail
+from app.finetune.qualitative_advice import (
+    ability_whitelist_block,
+    champion_text,
+    fact_grounding_check,
+    fetch_champion_detail,
+)
 from app.models import Advice, MatchupStat
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "finetune" / "data"
@@ -136,11 +141,12 @@ def build_pair_with_context(stat_row: dict) -> dict:
     )
     champ_a_kit = f"{stat_row['champ_a']} kit: {champion_text(champ_a_detail)}"
     champ_b_kit = f"{stat_row['champ_b']} kit: {champion_text(champ_b_detail)}"
+    whitelist = ability_whitelist_block(stat_row["champ_a"], champ_a_detail, stat_row["champ_b"], champ_b_detail)
     return {
         "champ_a": stat_row["champ_a"], "champ_b": stat_row["champ_b"], "role": stat_row["role"],
         "rank_bracket": stat_row["rank"], "sample_size": stat_row["sample_size"],
         "win_rate": stat_row["win_rate"],
-        "generation_prompt": f"{context_block}\n{champ_a_kit}\n{champ_b_kit}",
+        "generation_prompt": f"{context_block}\n{champ_a_kit}\n{champ_b_kit}\n{whitelist}",
     }
 
 
@@ -176,6 +182,98 @@ def _advice_already_written(session: Session, pair: dict, patch: str) -> bool:
     return existing is not None
 
 
+def _generate_and_check_pair(pair: dict, model, tokenizer, max_new_tokens: int, **gen_kwargs) -> dict:
+    """Real generate() call for one pair + grounding/section-split check.
+    No DB access -- callers decide what (if anything) to do to existing
+    rows based on whether this passed, before writing anything.
+    `**gen_kwargs` passes through to eval.generate() unchanged (empty by
+    default -> the existing greedy/deterministic behavior); used by
+    _generate_and_check_pair_with_sampling_retry to override decoding on
+    retry attempts only."""
+    output = generate(model, tokenizer, pair["generation_prompt"], max_new_tokens, **gen_kwargs)
+    expected_pct = round(pair["win_rate"] * 100)
+    grounding = fact_grounding_check(output, pair["generation_prompt"], expected_pct)
+    sections = split_into_sections(output)
+
+    if sections is None or not grounding["passed"]:
+        return {
+            "passed": False,
+            "champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "role": pair["role"],
+            "reason": "could_not_split_sections" if sections is None else "grounding_failed",
+            "invented_phrases": grounding["invented_phrases"],
+            "model_output": output,
+        }
+    return {"passed": True, "sections": sections}
+
+
+# docs/decisions/phase3-ability-whitelist-retry.md's root-cause finding:
+# generation here is greedy/deterministic (eval.generate's do_sample=False
+# default), so a single failing attempt never self-corrects. temperature=0.7/
+# top_p=0.9 are the standard "mild" sampling defaults (same range
+# Hugging Face's own generate() docs use as an example) -- not tuned per
+# pair, just enough randomness to let the model land on a different token
+# path than the deterministic one that already failed.
+SAMPLING_GEN_KWARGS = {"do_sample": True, "temperature": 0.7, "top_p": 0.9}
+MAX_SAMPLING_RETRIES = 2  # extra attempts after the initial greedy one
+
+
+def _generate_and_check_pair_with_sampling_retry(pair: dict, model, tokenizer, max_new_tokens: int) -> dict:
+    """Same contract as _generate_and_check_pair (one greedy attempt), but
+    falls back to up to MAX_SAMPLING_RETRIES sampled attempts
+    (SAMPLING_GEN_KWARGS) if the greedy attempt fails grounding/section-
+    split. Returns the first attempt (greedy or sampled) that passes; if
+    all attempts fail, returns the LAST attempt's failing result unchanged
+    -- same skip-reason shape callers already handle, no new failure mode."""
+    check = _generate_and_check_pair(pair, model, tokenizer, max_new_tokens)
+    if check["passed"]:
+        return check
+    for _ in range(MAX_SAMPLING_RETRIES):
+        check = _generate_and_check_pair(pair, model, tokenizer, max_new_tokens, **SAMPLING_GEN_KWARGS)
+        if check["passed"]:
+            return check
+    return check
+
+
+def _write_pair_sections(session: Session, pair: dict, patch: str, sections: dict[str, str]) -> dict:
+    """Writes MatchupStat rows (ON CONFLICT DO NOTHING) + Advice rows for
+    `pair`, given sections that already passed _generate_and_check_pair.
+    Shared by run_precompute_batch and force_regenerate_pairs so the two
+    never drift -- one real write path, not two."""
+    phase_to_stat_id = {}
+    for phase in ("early", "mid", "late"):
+        stmt = insert(MatchupStat).values(
+            champ_a=pair["champ_a"], champ_b=pair["champ_b"], role=pair["role"],
+            rank_bracket=pair["rank_bracket"], phase=phase,
+            win_rate=pair["win_rate"], sample_size=pair["sample_size"], patch=patch,
+        ).on_conflict_do_nothing(
+            index_elements=["champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"]
+        ).returning(MatchupStat.id)
+        result = session.execute(stmt).first()
+        if result is None:
+            result = session.execute(
+                select(MatchupStat.id).where(
+                    MatchupStat.champ_a == pair["champ_a"], MatchupStat.champ_b == pair["champ_b"],
+                    MatchupStat.role == pair["role"], MatchupStat.rank_bracket == pair["rank_bracket"],
+                    MatchupStat.phase == phase, MatchupStat.patch == patch,
+                )
+            ).first()
+        phase_to_stat_id[phase] = result[0]
+
+    for phase in ("early", "mid", "late"):
+        session.execute(
+            insert(Advice).values(
+                champ_a=pair["champ_a"], champ_b=pair["champ_b"], role=pair["role"],
+                rank_bracket=pair["rank_bracket"], phase=phase, text=sections[phase],
+                fact_source_id=phase_to_stat_id[phase], patch=patch,
+                is_abstention=0, tier="eager",
+            ).on_conflict_do_nothing(
+                index_elements=["champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"]
+            )
+        )
+    session.commit()
+    return {"champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "role": pair["role"]}
+
+
 def run_precompute_batch(patch: str, engine=None, pairs: list[dict] | None = None,
                           adapter_dir: Path = DEFAULT_ADAPTER_DIR, max_new_tokens: int = MAX_NEW_TOKENS) -> dict:
     """Generates real advice for `pairs` (defaults to the 10-pair sample)
@@ -203,57 +301,101 @@ def run_precompute_batch(patch: str, engine=None, pairs: list[dict] | None = Non
             if model is None:
                 model, tokenizer = load_model_and_tokenizer(adapter_dir)
 
-            output = generate(model, tokenizer, pair["generation_prompt"], max_new_tokens)
-            expected_pct = round(pair["win_rate"] * 100)
-            grounding = fact_grounding_check(output, pair["generation_prompt"], expected_pct)
-            sections = split_into_sections(output)
-
-            if sections is None or not grounding["passed"]:
-                skipped.append({
-                    "champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "role": pair["role"],
-                    "reason": "could_not_split_sections" if sections is None else "grounding_failed",
-                    "invented_phrases": grounding["invented_phrases"],
-                    "model_output": output,
-                })
+            check = _generate_and_check_pair(pair, model, tokenizer, max_new_tokens)
+            if not check["passed"]:
+                skipped.append(check)
                 continue
-
-            phase_to_stat_id = {}
-            for phase in ("early", "mid", "late"):
-                stmt = insert(MatchupStat).values(
-                    champ_a=pair["champ_a"], champ_b=pair["champ_b"], role=pair["role"],
-                    rank_bracket=pair["rank_bracket"], phase=phase,
-                    win_rate=pair["win_rate"], sample_size=pair["sample_size"], patch=patch,
-                ).on_conflict_do_nothing(
-                    index_elements=["champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"]
-                ).returning(MatchupStat.id)
-                result = session.execute(stmt).first()
-                if result is None:
-                    result = session.execute(
-                        select(MatchupStat.id).where(
-                            MatchupStat.champ_a == pair["champ_a"], MatchupStat.champ_b == pair["champ_b"],
-                            MatchupStat.role == pair["role"], MatchupStat.rank_bracket == pair["rank_bracket"],
-                            MatchupStat.phase == phase, MatchupStat.patch == patch,
-                        )
-                    ).first()
-                phase_to_stat_id[phase] = result[0]
-
-            for phase in ("early", "mid", "late"):
-                session.execute(
-                    insert(Advice).values(
-                        champ_a=pair["champ_a"], champ_b=pair["champ_b"], role=pair["role"],
-                        rank_bracket=pair["rank_bracket"], phase=phase, text=sections[phase],
-                        fact_source_id=phase_to_stat_id[phase], patch=patch,
-                        is_abstention=0, tier="eager",
-                    ).on_conflict_do_nothing(
-                        index_elements=["champ_a", "champ_b", "role", "rank_bracket", "phase", "patch"]
-                    )
-                )
-            session.commit()
-            written_pairs.append({"champ_a": pair["champ_a"], "champ_b": pair["champ_b"], "role": pair["role"]})
+            written_pairs.append(_write_pair_sections(session, pair, patch, check["sections"]))
     finally:
         session.close()
 
     return {"written_pairs": written_pairs, "already_present": already_present, "skipped": skipped}
+
+
+def force_regenerate_pairs(patch: str, targets: list[tuple[str, str, str]], engine=None,
+                            pairs: list[dict] | None = None, adapter_dir: Path = DEFAULT_ADAPTER_DIR,
+                            max_new_tokens: int = MAX_NEW_TOKENS, sampling_retry: bool = False) -> dict:
+    """Scoped forced regeneration for exactly the (champ_a, champ_b, role)
+    triples in `targets` -- e.g. rows found contaminated by a since-fixed
+    bug in champion_text(). Unlike run_precompute_batch, this deletes each
+    target pair's existing Advice + MatchupStat rows (this patch only) --
+    but only *after* a real regeneration for that same pair has already
+    passed the grounding/section-split check, never before. Deleting first
+    was tried and reverted: a real run against this pipeline hit a
+    genuine (deterministic, greedy-decoded) grounding failure on one of
+    the two target pairs, unrelated to markup -- deleting before checking
+    would have destroyed that pair's only row for nothing. Old row is left
+    completely alone if regeneration doesn't pass.
+
+    Deliberately does NOT touch any row outside `targets`: only pairs whose
+    (champ_a, champ_b, role) is in `targets` are deleted or regenerated.
+    This is the mistake documented in phase3-eager-tier-precompute.md's
+    "Idempotency" section (an overly broad check once regenerated all 109
+    candidate pairs instead of the intended subset) -- guarded against here
+    by scoping every delete/select to one exact triple at a time, never a
+    broader existence check.
+
+    `pairs` defaults to building real context (rank_real_candidate_pairs +
+    build_pair_with_context) for exactly `targets`; pass explicit `pairs`
+    (same shape run_precompute_batch expects) to avoid the real Data
+    Dragon/CSV calls, e.g. in tests.
+
+    `sampling_retry` (default False -- does not change the default,
+    deterministic path used by run_precompute_batch or any existing
+    force_regenerate_pairs caller): when True, a pair whose greedy
+    generation fails grounding/section-split gets up to
+    MAX_SAMPLING_RETRIES more attempts with SAMPLING_GEN_KWARGS before
+    being counted as skipped. Opt-in per-call, not a global default, since
+    it makes generation non-deterministic for whichever pairs use it.
+    """
+    if pairs is None:
+        candidates = {
+            (r["champ_a"], r["champ_b"], r["role"]): r for r in rank_real_candidate_pairs()
+        }
+        pairs = [build_pair_with_context(candidates[t]) for t in targets if t in candidates]
+
+    pairs_by_key = {(p["champ_a"], p["champ_b"], p["role"]): p for p in pairs}
+
+    session = sessionmaker(bind=engine)()
+    written_pairs, skipped = [], []
+    model = tokenizer = None
+    try:
+        for target in targets:
+            pair = pairs_by_key.get(target)
+            if pair is None:
+                skipped.append({"champ_a": target[0], "champ_b": target[1], "role": target[2],
+                                 "reason": "no_real_context_available"})
+                continue
+
+            if model is None:
+                model, tokenizer = load_model_and_tokenizer(adapter_dir)
+
+            check_fn = _generate_and_check_pair_with_sampling_retry if sampling_retry else _generate_and_check_pair
+            check = check_fn(pair, model, tokenizer, max_new_tokens)
+            if not check["passed"]:
+                # Old row (if any) is untouched -- nothing deleted yet.
+                skipped.append(check)
+                continue
+
+            # Only now, with a real passing regeneration in hand, delete
+            # exactly this pair's existing rows (this patch only) -- never
+            # a broader match. rank_bracket comes from `pair`, itself
+            # derived only from this same target, not a wildcard.
+            session.execute(delete(Advice).where(
+                Advice.champ_a == pair["champ_a"], Advice.champ_b == pair["champ_b"],
+                Advice.role == pair["role"], Advice.rank_bracket == pair["rank_bracket"],
+                Advice.patch == patch,
+            ))
+            session.execute(delete(MatchupStat).where(
+                MatchupStat.champ_a == pair["champ_a"], MatchupStat.champ_b == pair["champ_b"],
+                MatchupStat.role == pair["role"], MatchupStat.rank_bracket == pair["rank_bracket"],
+                MatchupStat.patch == patch,
+            ))
+            written_pairs.append(_write_pair_sections(session, pair, patch, check["sections"]))
+    finally:
+        session.close()
+
+    return {"written_pairs": written_pairs, "skipped": skipped}
 
 
 if __name__ == "__main__":

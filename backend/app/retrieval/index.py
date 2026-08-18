@@ -12,6 +12,8 @@ architecture.md and sourced from app.data_pipeline.aggregate instead.
 """
 from __future__ import annotations
 
+import html
+import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -21,19 +23,35 @@ from sentence_transformers import SentenceTransformer
 # see docs/tech-stack.md #7's rationale for a small local embedding model.
 DEFAULT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
+# Data Dragon embeds its own markup vocabulary in ability text --
+# <font color='...'>, <status>, <scaleAP>, <keywordMajor>, <br>, etc. (real
+# inventory found fetching Kayn/Warwick/Ahri/Yasuo/Vel'Koz detail JSON --
+# see docs/decisions/phase3-markup-stripping-fix.md). None of it is
+# meaningful to an embedding model, so strip any tag generically rather
+# than special-casing the one pattern (<font>) a bug report happened to
+# name -- root-cause fix in the shared function every caller routes
+# through.
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_markup(text: str) -> str:
+    return html.unescape(_TAG_RE.sub("", text))
+
 
 def champion_text(champ_data: dict) -> str:
     """Flatten one Data Dragon champion entry (as returned by
     app.data_pipeline.data_dragon.fetch_champion_data) into a single string
     for embedding: name, blurb, passive, and each spell's name+description.
-    Kit/ability text only -- no numeric balance fields."""
+    Kit/ability text only -- no numeric balance fields. Data Dragon's
+    embedded HTML-like markup (<font>, <status>, <br>, ...) and HTML
+    entities are stripped."""
     parts = [champ_data["name"], champ_data.get("blurb", "")]
     passive = champ_data.get("passive")
     if passive:
         parts.append(f"{passive.get('name', '')}: {passive.get('description', '')}")
     for spell in champ_data.get("spells", []):
         parts.append(f"{spell.get('name', '')}: {spell.get('description', '')}")
-    return "\n".join(p for p in parts if p)
+    return "\n".join(_strip_markup(p) for p in parts if p)
 
 
 @dataclass
