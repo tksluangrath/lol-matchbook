@@ -14,6 +14,13 @@
 # real-pair seeding, which itself imports app.finetune.eval -> peft at
 # module level) -- a collection-time ImportError in one file aborts the
 # whole pytest session, so these can't just be left to fail individually.
+#
+# Also excludes test_context_conditioned_qa.py: needs local fine-tuning
+# data artifacts (app/finetune/data/train.jsonl, heldout.jsonl) that are
+# gitignored and deliberately excluded from the Docker build context
+# (.dockerignore) -- confirmed real, pre-existing failures, not caused by
+# this image (docs/decisions/phase-docker-dev-ci-setup.md), that can never
+# pass here by design.
 name: backend-tests
 
 on:
@@ -56,4 +63,5 @@ jobs:
             --ignore=tests/integration/test_qualitative_dedicated_v2_adapter_fact_ledger.py \
             --ignore=tests/integration/test_qualitative_oversampled_adapter_fact_ledger.py \
             --ignore=tests/integration/test_qualitative_adapter_fact_ledger.py \
+            --ignore=tests/unit/test_context_conditioned_qa.py \
             -v
