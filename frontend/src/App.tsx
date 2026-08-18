@@ -3,8 +3,10 @@ import './App.css'
 import { MessageList } from './components/MessageList'
 import { InputBox } from './components/InputBox'
 import { fetchAdvice } from './api/advice'
+import { fetchChampionNames } from './api/championList'
 import { mockAskClient } from './api/ask.mock'
 import { mockLcuClient, type LcuChampSelectState } from './api/lcu.mock'
+import { HELP_TEXT, parseSlashCommand } from './commands'
 import type { ChatMessage } from './chatTypes'
 
 let idCounter = 0
@@ -22,18 +24,25 @@ export default function App() {
     setMessages((prev) => [...prev, message])
   }
 
+  // Shared by the LCU auto-detect path and the /advice command -- both real
+  // /advice callers render through this one fetch+classify+render path
+  // rather than each having their own.
+  async function fetchAndRenderAdvice(champA: string, champB: string, role: string, rank: string) {
+    try {
+      const result = await fetchAdvice({ champA, champB, role, rank })
+      pushMessage({ id: nextId(), kind: 'advice', champA, champB, result })
+    } catch {
+      pushMessage({ id: nextId(), kind: 'error', text: 'Could not reach the advice service. Is the backend running?' })
+    }
+  }
+
   async function runAdviceLookup(state: NonNullable<LcuChampSelectState>) {
     pushMessage({
       id: nextId(),
       kind: 'user',
       text: `Champ select detected: ${state.champA} vs ${state.champB} (${state.role}, ${state.rank})`,
     })
-    try {
-      const result = await fetchAdvice({ champA: state.champA, champB: state.champB, role: state.role, rank: state.rank })
-      pushMessage({ id: nextId(), kind: 'advice', champA: state.champA, champB: state.champB, result })
-    } catch {
-      pushMessage({ id: nextId(), kind: 'error', text: 'Could not reach the advice service. Is the backend running?' })
-    }
+    await fetchAndRenderAdvice(state.champA, state.champB, state.role, state.rank)
   }
 
   useEffect(() => {
@@ -47,8 +56,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleAsk(question: string) {
-    pushMessage({ id: nextId(), kind: 'user', text: question })
+  async function runAskMock(question: string) {
     const state = champSelectRef.current
     const assistantId = nextId()
     pushMessage({ id: assistantId, kind: 'assistant-text', text: '', streaming: true })
@@ -74,6 +82,54 @@ export default function App() {
     }
   }
 
+  async function handleSubmit(text: string) {
+    pushMessage({ id: nextId(), kind: 'user', text })
+
+    if (!text.startsWith('/')) {
+      await runAskMock(text)
+      return
+    }
+
+    setBusy(true)
+    try {
+      // Only /advice needs the real champion list -- skip the network call
+      // for /help, /ask, and anything else (the fetch is cached after the
+      // first real /advice command anyway, via championList.ts).
+      const commandWord = text.trim().slice(1).split(/\s+/)[0]?.toLowerCase()
+      const championNames = commandWord === 'advice' ? await fetchChampionNames() : []
+      const command = parseSlashCommand(text, championNames)
+      switch (command.kind) {
+        case 'help':
+          pushMessage({ id: nextId(), kind: 'assistant-text', text: HELP_TEXT, streaming: false })
+          return
+        case 'advice_incomplete':
+          pushMessage({ id: nextId(), kind: 'error', text: command.message })
+          return
+        case 'unrecognized':
+          pushMessage({
+            id: nextId(),
+            kind: 'error',
+            text: `"${command.raw}" isn't a recognized command. Try /help.`,
+          })
+          return
+        case 'advice':
+          await fetchAndRenderAdvice(command.champA, command.champB, command.role, command.rank)
+          return
+        case 'ask':
+          await runAskMock(command.question)
+          return
+      }
+    } catch {
+      pushMessage({
+        id: nextId(),
+        kind: 'error',
+        text: 'Could not load the champion list, so /advice can\'t validate names right now. Is the network reachable?',
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -87,7 +143,7 @@ export default function App() {
       </header>
       <main className="app-main">
         <MessageList messages={messages} />
-        <InputBox onSubmit={(text) => void handleAsk(text)} disabled={busy} />
+        <InputBox onSubmit={(text) => void handleSubmit(text)} disabled={busy} />
       </main>
     </div>
   )
