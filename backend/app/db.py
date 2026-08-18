@@ -11,9 +11,12 @@ from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
 
-# TODO(Phase 1): decide whether pgserver is started here (in-process) or by the
-# Tauri sidecar wrapper before the backend launches. Either way, this module
-# should not assume Postgres is already running -- handle connection retry.
+# Decided: pgserver starts in-process, via app.main's lifespan handler
+# (app.db_migrate.migrate()), which reassigns `engine`/`SessionLocal` below
+# to the real pgserver URI before the app accepts requests. This module-level
+# engine is just a placeholder so `from app.db import get_db` doesn't fail
+# at import time -- get_db() re-reads SessionLocal from this module's
+# namespace on every call, so the lifespan's reassignment takes effect.
 engine = create_engine(settings.database_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
