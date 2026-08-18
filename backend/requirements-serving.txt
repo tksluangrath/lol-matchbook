@@ -1,0 +1,38 @@
+# Serving-only subset of requirements.txt, for the Docker dev/CI image
+# (see docs/decisions/phase-docker-dev-ci-setup.md). Excludes the
+# fine-tuning stack (torch/transformers/peft/trl/bitsandbytes/accelerate/
+# vllm) which is not imported anywhere in app/routers, app/llm,
+# app/retrieval, app/db*, app/config, app/models, or app/lcu -- confirmed
+# by grepping actual imports, not guessed from package names. If a serving
+# code path ever needs one of those, add it here deliberately.
+
+# Web framework -- see docs/tech-stack.md #2
+fastapi
+uvicorn[standard]
+websockets
+
+# DB -- Postgres + pgvector via embedded pgserver, see docs/tech-stack.md #4
+pgserver
+sqlalchemy
+pgvector
+psycopg[binary]
+
+# Live follow-up path: CPU-quantized, embedded in-process. See docs/tech-stack.md #5
+llama-cpp-python
+
+# Local embeddings for the retrieval layer -- zero cost, no cloud API. docs/tech-stack.md #7
+sentence-transformers
+
+# Riot API client (app/routers/advice.py archetype-fallback call,
+# app/finetune/qualitative_advice.py which app/llm/context.py imports)
+requests
+httpx
+
+# Config / env
+python-dotenv
+pydantic-settings
+
+# Testing -- only the serving-path suite runs in this image (no torch stack).
+# See docs/decisions/phase-docker-dev-ci-setup.md for which test files that excludes.
+pytest
+pytest-asyncio

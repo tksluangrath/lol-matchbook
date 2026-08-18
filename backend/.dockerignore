@@ -1,0 +1,34 @@
+# Build-context excludes for backend/Dockerfile. See
+# docs/decisions/phase-docker-dev-ci-setup.md.
+
+.git
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# training artifacts / large model files -- never needed in the serving image
+app/finetune/artifacts/
+app/finetune/data/
+app/llm/checkpoints/
+*.gguf
+*.safetensors
+*.bin
+
+# raw match data pulls
+app/data_pipeline/raw/
+app/data_pipeline/cache/
+
+# embedded postgres data dir -- mounted as a volume, not baked into the image
+.pgdata/
+*.sqlite3
+
+# secrets / local env
+.env
+*.pem
+*.key
+
+.DS_Store

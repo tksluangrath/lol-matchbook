@@ -1,0 +1,53 @@
+# No CI workflow existed in this repo before this file -- added minimal and
+# scoped to running the backend's serving-path test suite inside the dev/CI
+# Docker image built from backend/Dockerfile. See
+# docs/decisions/phase-docker-dev-ci-setup.md. Not a deploy pipeline: this
+# project ships as a Tauri + PyInstaller desktop app (docs/build-plan.md
+# Phase 6), unrelated to this Docker image.
+#
+# Excludes tests that import the fine-tuning stack (torch/transformers/
+# peft/trl/bitsandbytes/vllm) -- those deps are deliberately not in this
+# image (see backend/requirements-serving.txt). Run those against the full
+# requirements.txt in a real training environment, not here.
+name: backend-tests
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t lol-matchup-backend:ci backend
+
+      - name: Run serving-path test suite in container
+        run: |
+          docker run --rm lol-matchup-backend:ci python -m pytest tests \
+            --ignore=tests/unit/test_eager_tier_ranking.py \
+            --ignore=tests/unit/test_forced_regeneration_scope.py \
+            --ignore=tests/unit/test_full_scale_oversample.py \
+            --ignore=tests/unit/test_oversample_to_count.py \
+            --ignore=tests/unit/test_sampling_retry.py \
+            --ignore=tests/unit/test_stratified_sample.py \
+            --ignore=tests/integration/test_finetune_eval.py \
+            --ignore=tests/integration/test_train_smoke.py \
+            --ignore=tests/integration/test_gguf_conversion_quality.py \
+            --ignore=tests/integration/test_precompute_batch.py \
+            --ignore=tests/integration/test_advice_endpoint.py \
+            --ignore=tests/integration/test_qualitative_dedicated_adapter_fact_ledger.py \
+            --ignore=tests/integration/test_context_adapter_fact_ledger.py \
+            --ignore=tests/integration/test_full_scale_adapter_fact_ledger.py \
+            --ignore=tests/integration/test_qualitative_dedicated_v2_adapter_fact_ledger.py \
+            --ignore=tests/integration/test_qualitative_oversampled_adapter_fact_ledger.py \
+            --ignore=tests/integration/test_qualitative_adapter_fact_ledger.py \
+            -v

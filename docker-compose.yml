@@ -1,0 +1,30 @@
+# Dev/CI convenience only -- not the product's deployment path (that's Tauri +
+# PyInstaller, docs/build-plan.md Phase 6). One service: pgserver runs
+# embedded inside the backend container itself (docs/tech-stack.md #4), not
+# as a separate postgres service -- that's the whole point of pgserver.
+# See docs/decisions/phase-docker-dev-ci-setup.md.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - pgdata:/app/.pgdata
+    environment:
+      RIOT_API_KEY: ${RIOT_API_KEY:-}
+      RIOT_PLATFORM: ${RIOT_PLATFORM:-na1}
+      RIOT_REGION: ${RIOT_REGION:-americas}
+      ADAPTER_PATH: ${ADAPTER_PATH:-}
+      FOLLOWUP_MODEL_PATH: ${FOLLOWUP_MODEL_PATH:-}
+      BACKEND_PORT: "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  pgdata:
