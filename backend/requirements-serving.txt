@@ -11,11 +11,19 @@ fastapi
 uvicorn[standard]
 websockets
 
-# DB -- Postgres + pgvector via embedded pgserver, see docs/tech-stack.md #4
+# DB -- Postgres + pgvector via embedded pgserver, see docs/tech-stack.md #4.
+# Every DB URL in this codebase is a plain postgresql:// (pgserver's own
+# get_uri(), never +psycopg) -- SQLAlchemy's default dialect for that scheme
+# is psycopg2, not psycopg3, confirmed via
+# sqlalchemy.dialects.registry.load('postgresql'). psycopg2-binary is the
+# real driver actually used; psycopg[binary] (v3) was listed here but never
+# imported anywhere in app/, a real CI-only gap the local dev env masked
+# (psycopg2-binary happened to already be installed there from before the
+# serving/training requirements split).
 pgserver
 sqlalchemy
 pgvector
-psycopg[binary]
+psycopg2-binary
 
 # Live follow-up path: CPU-quantized, embedded in-process. See docs/tech-stack.md #5
 llama-cpp-python
