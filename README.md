@@ -23,6 +23,7 @@ Start with [`docs/build-plan.md`](./docs/build-plan.md) — it's the phased buil
 - [`docs/tech-stack.md`](./docs/tech-stack.md) — every stack choice (Tauri, FastAPI, Postgres/pgvector via `pgserver`, `llama-cpp-python`, local embeddings) with pros/cons.
 - [`docs/testing-strategy.md`](./docs/testing-strategy.md) — code-level test plan (unit/integration/E2E) by component.
 - [`docs/architecture-evaluation.md`](./docs/architecture-evaluation.md) — a critical review of the above, including one open finding (precompute throughput was never sized) that Phase 0 of the build plan exists to resolve.
+- [`frontend/README.md`](./frontend/README.md) — the chat UI's palette/state-to-color mapping and which two interfaces (`POST /ask`, LCU auto-detection) are currently mocked and where to swap them in.
 
 ## Repo layout
 

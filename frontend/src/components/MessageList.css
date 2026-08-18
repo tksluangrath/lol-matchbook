@@ -1,0 +1,61 @@
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.chat-message {
+  max-width: 42rem;
+  padding: 0.7rem 1rem;
+  border-radius: 10px 10px 10px 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  animation: message-in 0.25s ease-out;
+}
+
+.chat-message--user {
+  align-self: flex-end;
+  border-radius: 10px 10px 4px 10px;
+  border-color: var(--color-teal);
+}
+
+.chat-message--assistant[aria-busy='true'] {
+  border-color: var(--color-teal);
+  animation:
+    message-in 0.25s ease-out,
+    pulse-glow 1.7s ease-in-out infinite;
+}
+
+.chat-message--error {
+  border-radius: 10px;
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(10, 200, 185, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(10, 200, 185, 0);
+  }
+}

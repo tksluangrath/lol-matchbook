@@ -1,0 +1,52 @@
+.input-box {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.input-box__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.input-box input {
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  transition: box-shadow 0.15s ease;
+}
+
+.input-box input:focus-visible {
+  box-shadow: 0 0 0 3px rgba(10, 200, 185, 0.15);
+}
+
+.input-box button {
+  flex-shrink: 0;
+  background: var(--color-teal);
+  color: var(--color-bg);
+  border: none;
+  clip-path: polygon(10% 0, 100% 0, 100% 100%, 10% 100%, 0 50%);
+  padding: 0.6rem 1.3rem 0.6rem 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.input-box button:disabled {
+  background: var(--color-grey-strong);
+  cursor: not-allowed;
+}

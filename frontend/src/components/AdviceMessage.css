@@ -1,0 +1,107 @@
+.advice-message {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--advice-accent, var(--color-border));
+  border-radius: 4px 10px 10px 4px;
+  padding: 0.9rem 1.1rem;
+  max-width: 42rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  animation: advice-in 0.25s ease-out;
+}
+
+.advice-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.advice-heading {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.advice-badge {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-bg);
+  background: var(--badge-accent, var(--color-grey-strong));
+  padding: 0.24rem 0.6rem 0.24rem 0.75rem;
+  clip-path: polygon(12% 0, 100% 0, 100% 100%, 12% 100%, 0 50%);
+  white-space: nowrap;
+}
+
+.advice-note {
+  color: var(--color-grey-text);
+  margin: 0;
+}
+
+.advice-phases {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.advice-phase {
+  padding: 0.6rem 0.75rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.advice-phase:first-child {
+  border-left: none;
+}
+
+.advice-phase dt {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--advice-accent, var(--color-grey-text));
+  margin-bottom: 0.35rem;
+}
+
+.advice-phase dd {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+@keyframes advice-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .advice-phases {
+    grid-template-columns: 1fr;
+  }
+
+  .advice-phase {
+    border-left: none;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .advice-phase:first-child {
+    border-top: none;
+  }
+}
