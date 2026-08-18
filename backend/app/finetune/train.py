@@ -30,6 +30,8 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
+from app.finetune.prompts import SYSTEM_PROMPT
+
 MODEL_NAME = "Qwen/Qwen3-4B-Instruct-2507"
 DATA_PATH = Path(__file__).parent / "data" / "train.jsonl"
 OUTPUT_DIR = Path(__file__).parent / "artifacts" / "smoke-adapter"
@@ -38,13 +40,6 @@ SAMPLE_SEED = 42
 MAX_EXAMPLES = 500
 MAX_STEPS = 200
 LOG_EVERY = 10
-
-SYSTEM_PROMPT = (
-    "You are a League of Legends coach. Give concise, rank-aware matchup "
-    "advice for the game phase asked about. If you do not have reliable "
-    "data for this matchup at this rank, say so plainly instead of "
-    "inventing specifics."
-)
 
 TARGET_MODULES = [
     "q_proj",

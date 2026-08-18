@@ -17,7 +17,7 @@ import functools
 from pathlib import Path
 from typing import AsyncIterator, Iterator
 
-from app.finetune.train import SYSTEM_PROMPT
+from app.finetune.prompts import SYSTEM_PROMPT
 
 GGUF_PATH = (
     Path(__file__).resolve().parents[1] / "finetune" / "artifacts"
