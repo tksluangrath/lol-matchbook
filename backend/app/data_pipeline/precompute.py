@@ -75,9 +75,9 @@ CONTEXT_RE = re.compile(r"Context: (\d+) games? observed this patch between .+ w
 # (run_qualitative_dedicated_eval.py) -- real held-out generations use
 # label variants ("Mid-game:", "Late game:") with full, real content under
 # them; a stricter exact-match splitter would silently drop real advice.
-EARLY_RE = re.compile(r"\bEarly:")
-MID_RE = re.compile(r"\bMid-?game:|\bMid:")
-LATE_RE = re.compile(r"\bLate\s*game:|\bLate:")
+EARLY_RE = re.compile(r"\bEarly\s*game:|\bEarly:", re.IGNORECASE)
+MID_RE = re.compile(r"\bMid[-\s]*game:|\bMid:", re.IGNORECASE)
+LATE_RE = re.compile(r"\bLate\s*game:|\bLate:", re.IGNORECASE)
 
 
 def load_sample_pairs(n: int = 10) -> list[dict]:
