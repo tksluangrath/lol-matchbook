@@ -10,13 +10,33 @@ type Props = {
 
 const PHASE_LABELS = { early: 'Early', mid: 'Mid', late: 'Late' } as const
 
+/**
+ * Splits real generated phase prose into sentence-level bullets. Splits
+ * only after sentence-ending punctuation (. ! ?) followed by whitespace --
+ * semicolon-joined clauses ("Avoid X; do Y.") stay together as one bullet,
+ * not split on every clause. Render-only: does not touch stored text.
+ */
+export function splitIntoSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+}
+
 function PhaseBreakdown({ phases }: { phases: { early: string; mid: string; late: string } }) {
   return (
     <dl className="advice-phases">
       {(Object.keys(PHASE_LABELS) as Array<keyof typeof PHASE_LABELS>).map((phase) => (
         <div key={phase} className="advice-phase">
           <dt>{PHASE_LABELS[phase]}</dt>
-          <dd>{phases[phase]}</dd>
+          <dd>
+            <ul className="advice-phase-bullets">
+              {splitIntoSentences(phases[phase]).map((sentence, i) => (
+                // eslint-disable-next-line react/no-array-index-key -- sentences aren't stable identities
+                <li key={i}>{sentence}</li>
+              ))}
+            </ul>
+          </dd>
         </div>
       ))}
     </dl>

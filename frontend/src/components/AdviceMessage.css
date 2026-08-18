@@ -80,6 +80,22 @@
   color: var(--color-text);
 }
 
+.advice-phase-bullets {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.advice-phase-bullets li {
+  padding-left: 0.15rem;
+}
+
+.advice-phase-bullets li::marker {
+  color: var(--advice-accent, var(--color-grey-text));
+}
+
 @keyframes advice-in {
   from {
     opacity: 0;

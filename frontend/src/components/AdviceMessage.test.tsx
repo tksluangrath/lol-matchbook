@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { AdviceMessage } from './AdviceMessage'
+import { AdviceMessage, splitIntoSentences } from './AdviceMessage'
 import { colors } from '../theme'
 import type { AdviceResult } from '../api/advice'
 
 const phases = { early: 'early text', mid: 'mid text', late: 'late text' }
+
+// Real /advice text for the real, already-precomputed Aatrox/Kayle (top,
+// emerald) matchup -- pulled directly from a live GET /advice response,
+// not invented. Used to verify the sentence-split against real generated
+// prose, not a synthetic string that happens to split cleanly.
+const REAL_AATROX_KAYLE_EARLY =
+  "Aatrox’s high health and fear-driven crowd control can deter early ganks, but Kayle’s ability to gain attack range and her presence of a divine ally makes her a persistent threat. Avoid engaging directly in the early game; let Kayle establish positioning. Aatrox should use his stance to close gaps and prepare for a counter-punch, while Kayle can use her spellblade to pressure and harass if the opportunity arises."
+
+describe('splitIntoSentences on real generated /advice text', () => {
+  it('splits the real Aatrox/Kayle early-phase paragraph into exactly 3 sentences, keeping the semicolon-joined clause together', () => {
+    const sentences = splitIntoSentences(REAL_AATROX_KAYLE_EARLY)
+    expect(sentences).toHaveLength(3)
+    expect(sentences[1]).toBe('Avoid engaging directly in the early game; let Kayle establish positioning.')
+  })
+})
 
 describe('AdviceMessage renders all 4 real /advice response states distinctly', () => {
   it('precomputed hit: teal accent, phase breakdown, no fallback/abstention copy', () => {
