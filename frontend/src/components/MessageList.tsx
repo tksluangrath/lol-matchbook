@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../chatTypes'
+import { HELP_COMMANDS } from '../commands'
 import { AdviceMessage } from './AdviceMessage'
 import './MessageList.css'
 
@@ -34,6 +35,18 @@ export function MessageList({ messages }: Props) {
             return (
               <article key={message.id} className="chat-message chat-message--error" role="alert">
                 {message.text}
+              </article>
+            )
+          case 'help':
+            return (
+              <article key={message.id} className="chat-message chat-message--help" aria-label="Assistant">
+                <ul className="help-command-list">
+                  {HELP_COMMANDS.map(({ command, description }) => (
+                    <li key={command}>
+                      <code>{command}</code> -- {description}
+                    </li>
+                  ))}
+                </ul>
               </article>
             )
         }

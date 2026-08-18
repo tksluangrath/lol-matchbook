@@ -26,12 +26,17 @@ export type ParsedCommand =
   | { kind: 'advice_incomplete'; message: string }
   | { kind: 'unrecognized'; raw: string }
 
-export const HELP_TEXT = [
-  'Commands:',
-  '/help -- show this list',
-  '/advice <champA> vs <champB> [rank] [role] -- real precomputed matchup advice',
-  '/ask <question> -- placeholder only, not real retrieval yet',
-].join('\n')
+/** Structured, not a flat string -- rendered as a real list in the UI
+ * (MessageList's 'help' case), not newline-joined text that a plain
+ * <article> would collapse into one run-on line. */
+export const HELP_COMMANDS: { command: string; description: string }[] = [
+  { command: '/help', description: 'Show this list' },
+  {
+    command: '/advice <champA> vs <champB> [rank] [role]',
+    description: 'Real precomputed matchup advice',
+  },
+  { command: '/ask <question>', description: 'Placeholder only, not real retrieval yet' },
+]
 
 /** Strips punctuation/spaces and lowercases, so "Kai'Sa" / "kaisa" / "Kai Sa" all match. */
 function normalizeChampName(s: string): string {

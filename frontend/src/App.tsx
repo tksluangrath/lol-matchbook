@@ -6,7 +6,7 @@ import { fetchAdvice } from './api/advice'
 import { fetchChampionNames } from './api/championList'
 import { mockAskClient } from './api/ask.mock'
 import { mockLcuClient, type LcuChampSelectState } from './api/lcu.mock'
-import { HELP_TEXT, parseSlashCommand } from './commands'
+import { parseSlashCommand } from './commands'
 import type { ChatMessage } from './chatTypes'
 
 let idCounter = 0
@@ -100,7 +100,7 @@ export default function App() {
       const command = parseSlashCommand(text, championNames)
       switch (command.kind) {
         case 'help':
-          pushMessage({ id: nextId(), kind: 'assistant-text', text: HELP_TEXT, streaming: false })
+          pushMessage({ id: nextId(), kind: 'help' })
           return
         case 'advice_incomplete':
           pushMessage({ id: nextId(), kind: 'error', text: command.message })
