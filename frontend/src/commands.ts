@@ -21,7 +21,10 @@ export const REAL_ROLES = ['top', 'jungle', 'middle', 'bottom', 'support'] as co
 // fallback (routers/advice.py) serves the emerald row for any rank request
 // that misses at its exact tier, and a real player might reasonably be at
 // any of them.
-export const REAL_RANKS = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond'] as const
+export const REAL_RANKS = [
+  'iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond',
+  'master', 'grandmaster', 'challenger',
+] as const
 
 export type Role = (typeof REAL_ROLES)[number]
 export type Rank = (typeof REAL_RANKS)[number]
