@@ -62,8 +62,8 @@ def _seed_written(engine, pair, patch, marker: str):
 
 
 def test_force_regenerate_touches_only_named_target_not_bystander(monkeypatch, db):
-    monkeypatch.setattr(precompute, "generate", _fake_generate)
-    monkeypatch.setattr(precompute, "load_model_and_tokenizer", lambda adapter_dir: ("fake-model", "fake-tok"))
+    monkeypatch.setattr("app.finetune.eval.generate", _fake_generate)
+    monkeypatch.setattr("app.finetune.eval.load_model_and_tokenizer", lambda adapter_dir: ("fake-model", "fake-tok"))
 
     # Seed both pairs as already-written (simulates the real contaminated
     # rows already sitting in the live DB before this task's fix).
@@ -116,8 +116,8 @@ def test_force_regenerate_never_deletes_a_pair_not_named_in_targets(monkeypatch,
     # `targets`. Catches the exact "broad idempotency check" mistake named
     # in phase3-eager-tier-precompute.md: passing extra context/pairs must
     # never regenerate anything beyond `targets`.
-    monkeypatch.setattr(precompute, "generate", _fake_generate)
-    monkeypatch.setattr(precompute, "load_model_and_tokenizer", lambda adapter_dir: ("fake-model", "fake-tok"))
+    monkeypatch.setattr("app.finetune.eval.generate", _fake_generate)
+    monkeypatch.setattr("app.finetune.eval.load_model_and_tokenizer", lambda adapter_dir: ("fake-model", "fake-tok"))
 
     _seed_written(db, BYSTANDER, PATCH, "bystander")
     with db.connect() as conn:
@@ -151,11 +151,11 @@ def test_force_regenerate_leaves_targets_own_row_untouched_on_failed_check(monke
     # checking whether the new generation actually passes destroyed the
     # only copy of a pair's advice when regeneration failed. This proves
     # the fix: a failed check must never delete the pair's existing rows.
-    monkeypatch.setattr(precompute, "generate", _fake_generate)
-    monkeypatch.setattr(precompute, "load_model_and_tokenizer", lambda adapter_dir: ("fake-model", "fake-tok"))
+    monkeypatch.setattr("app.finetune.eval.generate", _fake_generate)
+    monkeypatch.setattr("app.finetune.eval.load_model_and_tokenizer", lambda adapter_dir: ("fake-model", "fake-tok"))
     _seed_written(db, TARGET, PATCH, "target")
 
-    monkeypatch.setattr(precompute, "generate", _fake_generate_hallucinated)
+    monkeypatch.setattr("app.finetune.eval.generate", _fake_generate_hallucinated)
     result = force_regenerate_pairs(
         PATCH, targets=[("Caitlyn", "Samira", "bottom")], engine=db, pairs=[TARGET],
     )

@@ -45,7 +45,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.data_pipeline.aggregate import aggregate_matchup_stats, filter_valid_matches
 from app.data_pipeline.riot_client import load_hf_csv_matches
-from app.finetune.eval import generate, load_model_and_tokenizer
 from app.finetune.qualitative_advice import (
     ability_whitelist_block,
     champion_text,
@@ -190,6 +189,8 @@ def _generate_and_check_pair(pair: dict, model, tokenizer, max_new_tokens: int, 
     default -> the existing greedy/deterministic behavior); used by
     _generate_and_check_pair_with_sampling_retry to override decoding on
     retry attempts only."""
+    from app.finetune.eval import generate  # lazy: keeps the training stack out of the serving image's import graph
+
     output = generate(model, tokenizer, pair["generation_prompt"], max_new_tokens, **gen_kwargs)
     expected_pct = round(pair["win_rate"] * 100)
     grounding = fact_grounding_check(output, pair["generation_prompt"], expected_pct)
@@ -299,6 +300,8 @@ def run_precompute_batch(patch: str, engine=None, pairs: list[dict] | None = Non
                 continue
 
             if model is None:
+                from app.finetune.eval import load_model_and_tokenizer  # lazy, see _generate_and_check_pair
+
                 model, tokenizer = load_model_and_tokenizer(adapter_dir)
 
             check = _generate_and_check_pair(pair, model, tokenizer, max_new_tokens)
@@ -368,6 +371,8 @@ def force_regenerate_pairs(patch: str, targets: list[tuple[str, str, str]], engi
                 continue
 
             if model is None:
+                from app.finetune.eval import load_model_and_tokenizer  # lazy, see _generate_and_check_pair
+
                 model, tokenizer = load_model_and_tokenizer(adapter_dir)
 
             check_fn = _generate_and_check_pair_with_sampling_retry if sampling_retry else _generate_and_check_pair

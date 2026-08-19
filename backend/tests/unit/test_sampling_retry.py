@@ -42,7 +42,7 @@ def test_stops_at_first_passing_sampled_attempt_and_uses_its_result(monkeypatch)
         # second sampled retry (call 3) passes.
         return FAIL_OUTPUT if len(calls) < 3 else PASS_OUTPUT
 
-    monkeypatch.setattr(precompute, "generate", fake_generate)
+    monkeypatch.setattr("app.finetune.eval.generate", fake_generate)
 
     result = _generate_and_check_pair_with_sampling_retry(PAIR, "fake-model", "fake-tok", 400)
 
@@ -61,7 +61,7 @@ def test_all_three_attempts_failing_returns_last_failure_not_a_crash(monkeypatch
         calls.append(gen_kwargs)
         return FAIL_OUTPUT
 
-    monkeypatch.setattr(precompute, "generate", fake_generate)
+    monkeypatch.setattr("app.finetune.eval.generate", fake_generate)
 
     result = _generate_and_check_pair_with_sampling_retry(PAIR, "fake-model", "fake-tok", 400)
 
