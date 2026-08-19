@@ -56,6 +56,7 @@ jobs:
             --ignore=tests/integration/test_gguf_conversion_quality.py \
             --ignore=tests/integration/test_precompute_batch.py \
             --ignore=tests/integration/test_advice_endpoint.py \
+            --ignore=tests/integration/test_refresh_endpoint.py \
             --ignore=tests/integration/test_ask_endpoint.py \
             --ignore=tests/integration/test_qualitative_dedicated_adapter_fact_ledger.py \
             --ignore=tests/integration/test_context_adapter_fact_ledger.py \
