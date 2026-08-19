@@ -15,6 +15,7 @@ in this same process so pgserver's managed subprocess stays alive for the
 container's lifetime.
 """
 import os
+import subprocess
 
 from app.db_migrate import start_pgserver
 
@@ -24,9 +25,25 @@ server = start_pgserver(PGDATA)
 os.environ["DATABASE_URL"] = server.get_uri()
 
 from app.models import Base  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
 
-Base.metadata.create_all(create_engine(server.get_uri()))
+engine = create_engine(server.get_uri())
+Base.metadata.create_all(engine)
+
+# Seed real precomputed data on a fresh DB -- there's no persistent disk on
+# a free-tier host, so PGDATA (and everything create_all just made) starts
+# empty on every container start there. Guarded by a real row count, not a
+# marker file, so this is safe to run every time regardless of host: a
+# populated DB (a real disk that did persist, or a restart of the same
+# container) is left alone.
+SEED_DATA_PATH = os.path.join(os.path.dirname(__file__), "app", "data_pipeline", "seed_data.sql")
+with engine.connect() as conn:
+    advice_count = conn.execute(text("SELECT count(*) FROM advice")).scalar()
+if advice_count == 0 and os.path.exists(SEED_DATA_PATH):
+    import pgserver
+
+    psql = os.path.join(os.path.dirname(pgserver.__file__), "pginstall", "bin", "psql")
+    subprocess.run([psql, server.get_uri(), "-f", SEED_DATA_PATH], check=True)
 
 import uvicorn  # noqa: E402
 
