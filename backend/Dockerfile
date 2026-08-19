@@ -19,13 +19,6 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# llama-cpp-python has no prebuilt wheel for this base image and compiles
-# from source (CMake/C++) -- build tools live only in this discarded builder
-# stage, not the final image.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake git \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
@@ -35,7 +28,24 @@ COPY requirements-serving.txt .
 # first, from PyTorch's CPU wheel index -- the default PyPI wheel drags in
 # ~1.5GB of CUDA/NVIDIA runtime libs this container will never use (this
 # app never touches the GPU the game needs, per ADR-001/tech-stack.md #5).
-RUN pip install --no-cache-dir torch --extra-index-url https://download.pytorch.org/whl/cpu \
+#
+# llama-cpp-python installed separately, first, from its own published CPU
+# wheel index (https://abetlen.github.io/llama-cpp-python/whl/cpu) -- a
+# real prebuilt manylinux2014_x86_64 wheel exists there (confirmed by
+# actually resolving and downloading it, not assumed), so this skips the
+# CMake/C++ source compile entirely rather than just capping its memory.
+# That source compile is a real, well-known memory-heavy build step
+# (llama.cpp's C++ core) regardless of what triggered this change -- worth
+# avoiding on any build host with a constrained memory budget. No version
+# pin on this line means an unpinned `pip install -r requirements-
+# serving.txt` would otherwise let pip fall back to building from source if
+# it ever preferred a version this index doesn't publish a wheel for --
+# installing it explicitly first, and letting the bulk install below see it
+# already satisfied, avoids that silently regressing. No apt build
+# toolchain (build-essential/cmake/git) is needed in this image at all
+# anymore -- it existed solely for this compile step.
+RUN pip install --no-cache-dir llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu \
+    && pip install --no-cache-dir torch --extra-index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir -r requirements-serving.txt
 
 FROM python:3.12-slim
