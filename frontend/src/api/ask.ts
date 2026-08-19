@@ -13,6 +13,11 @@
  *
  * Real server messages, one JSON object per WebSocket message:
  *   {"type": "chunk", "text": "..."} -- zero or more, in order
+ *   {"type": "warning", "message": "..."} -- zero or one, after the last
+ *     chunk: the real fact-grounding check (same one precompute.py gates
+ *     writes on) flagged an unverified claim in the response. Non-fatal --
+ *     the already-streamed answer is still shown, flagged rather than
+ *     silently dropped or treated as a stream-ending error.
  *   {"type": "done"}                 -- exactly one, ends the stream
  *   {"type": "error", "message": "..."} -- terminal, no further messages
  */
@@ -33,6 +38,7 @@ export const DEFAULT_ASK_WS_URL = 'ws://127.0.0.1:8000/ask'
 
 type AskServerMessage =
   | { type: 'chunk'; text: string }
+  | { type: 'warning'; message: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
 
@@ -93,6 +99,8 @@ export const askClient: AskClient = {
         const msg = queue.shift() as AskServerMessage
         if (msg.type === 'chunk') {
           yield msg.text
+        } else if (msg.type === 'warning') {
+          yield `\n\n⚠️ ${msg.message}`
         } else if (msg.type === 'done') {
           return
         } else {

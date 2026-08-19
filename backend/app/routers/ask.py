@@ -19,6 +19,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 import app.db as db
+from app.finetune.qualitative_advice import fact_grounding_check
 from app.llm.context import build_ask_context
 from app.llm.serve import stream_tokens
 
@@ -47,7 +48,7 @@ async def ask(websocket: WebSocket):
             # Retrieval (real DB query + real Data Dragon fetches) is
             # blocking I/O -- off the event loop, same reasoning as
             # stream_tokens for the generation itself.
-            prompt = await asyncio.to_thread(
+            ask_context = await asyncio.to_thread(
                 build_ask_context,
                 session,
                 payload["champ_a"],
@@ -61,8 +62,10 @@ async def ask(websocket: WebSocket):
             await websocket.close()
             return
 
+        full_response = []
         try:
-            async for chunk in stream_tokens(prompt):
+            async for chunk in stream_tokens(ask_context.prompt):
+                full_response.append(chunk)
                 await websocket.send_json({"type": "chunk", "text": chunk})
         except WebSocketDisconnect:
             return
@@ -70,6 +73,22 @@ async def ask(websocket: WebSocket):
             await websocket.send_json({"type": "error", "message": f"generation failed: {exc}"})
             await websocket.close()
             return
+
+        # Real fact-grounding check on the full generated response, the
+        # same check (unmodified) precompute.py's pipeline gates writes on.
+        # /ask streams live, so unlike precompute there's no "regenerate on
+        # failure" option without real added latency -- flag a failure to
+        # the client instead of either silently shipping an ungrounded
+        # claim or silently dropping content that already streamed.
+        grounding = fact_grounding_check("".join(full_response), ask_context.grounding_source, ask_context.win_rate_pct)
+        if not grounding["passed"]:
+            await websocket.send_json({
+                "type": "warning",
+                "message": (
+                    "This answer may contain an unverified claim: "
+                    f"{', '.join(grounding['invented_phrases'] + [f'{p}%' for p in grounding['mismatched_percentages']])}."
+                ),
+            })
 
         await websocket.send_json({"type": "done"})
         await websocket.close()
