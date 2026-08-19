@@ -1,6 +1,6 @@
 import type { ChatMessage } from '../chatTypes'
 import { HELP_COMMANDS } from '../commands'
-import { AdviceMessage, splitIntoSentences } from './AdviceMessage'
+import { AdviceMessage, renderInlineMarkdown, splitIntoSentences } from './AdviceMessage'
 import './MessageList.css'
 
 type Props = {
@@ -34,7 +34,7 @@ export function MessageList({ messages }: Props) {
                   <ul className="assistant-bullets">
                     {splitIntoSentences(message.text).map((sentence, i) => (
                       // eslint-disable-next-line react/no-array-index-key -- sentences aren't stable identities
-                      <li key={i}>{sentence}</li>
+                      <li key={i}>{renderInlineMarkdown(sentence)}</li>
                     ))}
                   </ul>
                 )}

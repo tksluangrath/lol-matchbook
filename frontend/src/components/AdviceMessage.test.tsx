@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { AdviceMessage, splitIntoSentences } from './AdviceMessage'
+import { AdviceMessage, renderInlineMarkdown, splitIntoSentences } from './AdviceMessage'
 import { colors } from '../theme'
 import type { AdviceResult } from '../api/advice'
 
@@ -18,6 +18,24 @@ describe('splitIntoSentences on real generated /advice text', () => {
     const sentences = splitIntoSentences(REAL_AATROX_KAYLE_EARLY)
     expect(sentences).toHaveLength(3)
     expect(sentences[1]).toBe('Avoid engaging directly in the early game; let Kayle establish positioning.')
+  })
+})
+
+describe('renderInlineMarkdown on real generated text containing literal "**bold**" markers', () => {
+  // Real /advice text observed live for Aphelios/Ezreal (bottom, emerald) --
+  // the model sometimes emits literal markdown bold that the frontend
+  // previously rendered as raw asterisks instead of emphasis.
+  const REAL_TEXT_WITH_BOLD = '**Advice:** Ezreal should prioritize killing low-health enemies.'
+
+  it('renders the bolded segment as <strong>, not literal asterisks', () => {
+    render(<div>{renderInlineMarkdown(REAL_TEXT_WITH_BOLD)}</div>)
+    const strong = screen.getByText('Advice:')
+    expect(strong.tagName).toBe('STRONG')
+    expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument()
+  })
+
+  it('passes plain text through unchanged when there is no bold marker', () => {
+    expect(renderInlineMarkdown('no markdown here')).toBe('no markdown here')
   })
 })
 

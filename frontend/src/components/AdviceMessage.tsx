@@ -23,6 +23,21 @@ export function splitIntoSentences(text: string): string[] {
     .filter(Boolean)
 }
 
+/**
+ * Renders literal "**bold**" markdown that sometimes leaks into generated
+ * text (the model isn't instructed to avoid it) as real emphasis instead of
+ * showing raw asterisks. Only handles bold -- the only markdown syntax
+ * observed in real generated text so far.
+ */
+export function renderInlineMarkdown(sentence: string): React.ReactNode {
+  const parts = sentence.split(/\*\*(.+?)\*\*/g)
+  if (parts.length === 1) return sentence
+  return parts.map((part, i) =>
+    // eslint-disable-next-line react/no-array-index-key -- parts aren't stable identities
+    i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
+  )
+}
+
 function PhaseBreakdown({ phases }: { phases: { early: string; mid: string; late: string } }) {
   return (
     <dl className="advice-phases">
@@ -33,7 +48,7 @@ function PhaseBreakdown({ phases }: { phases: { early: string; mid: string; late
             <ul className="advice-phase-bullets">
               {splitIntoSentences(phases[phase]).map((sentence, i) => (
                 // eslint-disable-next-line react/no-array-index-key -- sentences aren't stable identities
-                <li key={i}>{sentence}</li>
+                <li key={i}>{renderInlineMarkdown(sentence)}</li>
               ))}
             </ul>
           </dd>
