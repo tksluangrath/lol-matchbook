@@ -14,7 +14,7 @@ EXPECTED_VALID_MATCHES = 901
 THEORETICAL_CEILING = 6512
 
 EXPECTED_TOP_5 = [
-    ("Milio", "Nami", "utility", 20),
+    ("Milio", "Nami", "support", 20),
     ("Ezreal", "Jhin", "bottom", 15),
     ("Jhin", "Kaisa", "bottom", 14),
     ("Ezreal", "Jinx", "bottom", 13),

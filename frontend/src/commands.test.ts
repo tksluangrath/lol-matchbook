@@ -100,9 +100,9 @@ describe('parseSlashCommand', () => {
     expect(parseSlashCommand('/foobar', REAL_CHAMPIONS)).toEqual({ kind: 'unrecognized', raw: '/foobar' })
   })
 
-  it('/advice resolves a different real pair (Milio vs Nami, utility, gold) end to end', () => {
+  it('/advice resolves a different real pair (Milio vs Nami, utility typed as an alias for support, gold) end to end', () => {
     const result = parseSlashCommand('/advice milio vs nami gold utility', REAL_CHAMPIONS)
-    expect(result).toEqual({ kind: 'advice', champA: 'Milio', champB: 'Nami', rank: 'gold', role: 'utility' })
+    expect(result).toEqual({ kind: 'advice', champA: 'Milio', champB: 'Nami', rank: 'gold', role: 'support' })
   })
 
   it('/advice resolves champions typed with apostrophes and multi-word spacing in the same command', () => {

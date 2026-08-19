@@ -26,6 +26,11 @@ RANKED_SOLO_DUO_QUEUE_ID = 420
 PHASE = "not_available"
 RANK = "emerald"
 
+# Riot's raw team_position value is "UTILITY" -- lowercased alone gives
+# "utility", but this project's canonical role string is "support" (matches
+# how players/community actually refer to the role).
+ROLE_ALIASES = {"utility": "support"}
+
 
 def filter_valid_matches(matches: list[dict]) -> list[dict]:
     """Exclude surrendered games and anything that isn't ranked solo/duo
@@ -63,7 +68,8 @@ def _lane_matchups(match: dict):
                 if a["champion"] == b["champion"]:
                     continue  # a champion can't matchup against itself
                 lo, hi = sorted((a, b), key=lambda p: p["champion"])
-                yield lo["champion"], hi["champion"], role.lower(), lo["win"]
+                lowered = role.lower()
+                yield lo["champion"], hi["champion"], ROLE_ALIASES.get(lowered, lowered), lo["win"]
 
 
 def aggregate_matchup_stats(matches: list[dict]) -> list[dict]:

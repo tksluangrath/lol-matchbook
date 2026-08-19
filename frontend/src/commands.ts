@@ -10,14 +10,17 @@
  */
 
 // Real values confirmed against the live DB (Advice.role / Advice.rank_bracket
-// distinct columns) -- not guessed. 'support' and 'utility' both appear in
-// real data as distinct role strings; both are accepted here rather than
-// silently coercing one into the other.
-export const REAL_ROLES = ['top', 'jungle', 'middle', 'bottom', 'support', 'utility'] as const
+// distinct columns) -- not guessed. The backend's canonical role string is
+// now 'support' (app/data_pipeline/aggregate.py maps Riot's raw "UTILITY"
+// team_position to it) -- 'utility' is accepted here only as a typed alias,
+// via ROLE_ALIASES below, so old habits/muscle memory still resolve.
+export const REAL_ROLES = ['top', 'jungle', 'middle', 'bottom', 'support'] as const
 export const REAL_RANKS = ['iron', 'gold', 'platinum', 'emerald'] as const
 
 export type Role = (typeof REAL_ROLES)[number]
 export type Rank = (typeof REAL_RANKS)[number]
+
+const ROLE_ALIASES: Record<string, Role> = { utility: 'support' }
 
 export type ParsedCommand =
   | { kind: 'help' }
@@ -98,7 +101,7 @@ function parseAdvice(argsText: string, realChampionNames: string[]): ParsedComma
       }
     }
     if (!role) {
-      const r = matchToken(token, REAL_ROLES)
+      const r = matchToken(token, REAL_ROLES) ?? ROLE_ALIASES[token.toLowerCase()]
       if (r) {
         role = r
         continue
