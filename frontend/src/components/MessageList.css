@@ -61,6 +61,18 @@
   color: var(--color-teal);
 }
 
+.assistant-bullets {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.assistant-bullets li::marker {
+  color: var(--color-teal);
+}
+
 @keyframes message-in {
   from {
     opacity: 0;
