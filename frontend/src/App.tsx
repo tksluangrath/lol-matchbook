@@ -5,7 +5,7 @@ import { InputBox } from './components/InputBox'
 import { fetchAdvice } from './api/advice'
 import { fetchChampionNames } from './api/championList'
 import { askClient } from './api/ask'
-import { mockLcuClient, type LcuChampSelectState } from './api/lcu.mock'
+import { lcuClient, type LcuChampSelectState } from './api/lcu'
 import { parseSlashCommand } from './commands'
 import type { ChatMessage } from './chatTypes'
 
@@ -46,11 +46,19 @@ export default function App() {
   }
 
   useEffect(() => {
-    // LCU auto-detect: swap mockLcuClient for a real implementation in
-    // src/api/lcu.ts once the backend push exists (see lcu.mock.ts).
-    const unsubscribe = mockLcuClient.onChampSelect((state) => {
+    // The real listener polls every ~1.5s and re-pushes the same state on
+    // every tick while champ-select is ongoing (unlike the mock, which
+    // fired once) -- only fire a real advice lookup when the state
+    // actually changed, so this doesn't spam /advice or repeat the "Champ
+    // select detected" message once per poll.
+    const unsubscribe = lcuClient.onChampSelect((state) => {
+      const changed =
+        state?.champA !== champSelectRef.current?.champA ||
+        state?.champB !== champSelectRef.current?.champB ||
+        state?.role !== champSelectRef.current?.role ||
+        state?.rank !== champSelectRef.current?.rank
       champSelectRef.current = state
-      if (state) void runAdviceLookup(state)
+      if (state && changed) void runAdviceLookup(state)
     })
     return unsubscribe
     // eslint-disable-next-line react-hooks/exhaustive-deps
