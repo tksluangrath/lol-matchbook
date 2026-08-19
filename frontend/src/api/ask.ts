@@ -49,8 +49,19 @@ type AskServerMessage =
   | { type: 'done' }
   | { type: 'error'; message: string }
 
+// Set on the hosted Render Static Site deploy (free-tier backend can't run
+// real quantized inference) -- unset locally, so `npm run dev`'s /ask
+// behavior is unchanged. Thrown before any WebSocket is attempted; App.tsx's
+// existing runAsk() catch block already renders a thrown Error as a chat
+// error message, so no separate UI-gating code is needed for this to work.
+const HOSTED_DEMO = Boolean(import.meta.env.VITE_HOSTED_DEMO)
+
 export const askClient: AskClient = {
   async *ask(req: AskRequest) {
+    if (HOSTED_DEMO) {
+      throw new Error('/ask is not available in this hosted demo -- try /advice for a precomputed matchup instead.')
+    }
+
     const ws = new WebSocket(DEFAULT_ASK_WS_URL)
 
     // Bridges WebSocket's event callbacks into an async queue so the
