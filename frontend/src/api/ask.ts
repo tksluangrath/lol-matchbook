@@ -1,0 +1,106 @@
+/**
+ * Real client for POST /ask (backend/app/routers/ask.py), a WebSocket, not
+ * a streamed HTTP response as ask.mock.ts's docstring guessed before the
+ * real endpoint existed -- the wire shape below is read directly from the
+ * real handler and docs/decisions/phase4-ask-endpoint.md, not assumed to
+ * match the mock.
+ *
+ * Real request: {question, champ_a, champ_b, role, rank} -- role is
+ * REQUIRED (app/routers/ask.py's REQUIRED_FIELDS), even though
+ * docs/system-design.md's original contract omitted it; the real handler
+ * rejects a request missing it. The mock's AskRequest never carried role
+ * at all -- fixed here, not silently dropped.
+ *
+ * Real server messages, one JSON object per WebSocket message:
+ *   {"type": "chunk", "text": "..."} -- zero or more, in order
+ *   {"type": "done"}                 -- exactly one, ends the stream
+ *   {"type": "error", "message": "..."} -- terminal, no further messages
+ */
+export type AskRequest = {
+  question: string
+  champA: string
+  champB: string
+  role: string
+  rank: string
+}
+
+export interface AskClient {
+  /** Yields response text incrementally, matching the real streamed shape. */
+  ask(req: AskRequest): AsyncGenerator<string, void, unknown>
+}
+
+export const DEFAULT_ASK_WS_URL = 'ws://127.0.0.1:8000/ask'
+
+type AskServerMessage =
+  | { type: 'chunk'; text: string }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+
+export const askClient: AskClient = {
+  async *ask(req: AskRequest) {
+    const ws = new WebSocket(DEFAULT_ASK_WS_URL)
+
+    // Bridges WebSocket's event callbacks into an async queue so the
+    // generator can `await` the next message instead of nesting callbacks.
+    const queue: AskServerMessage[] = []
+    let resolveNext: (() => void) | null = null
+    let closedUnexpectedly = false
+
+    function wake() {
+      resolveNext?.()
+      resolveNext = null
+    }
+
+    ws.addEventListener('message', (event) => {
+      queue.push(JSON.parse(event.data as string) as AskServerMessage)
+      wake()
+    })
+    ws.addEventListener('close', (event) => {
+      if (!event.wasClean) closedUnexpectedly = true
+      wake()
+    })
+    ws.addEventListener('error', () => {
+      closedUnexpectedly = true
+      wake()
+    })
+
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener('open', () => resolve(), { once: true })
+      ws.addEventListener('error', () => reject(new Error('Could not connect to the /ask service.')), { once: true })
+    })
+
+    ws.send(
+      JSON.stringify({
+        question: req.question,
+        champ_a: req.champA,
+        champ_b: req.champB,
+        role: req.role,
+        rank: req.rank,
+      }),
+    )
+
+    try {
+      while (true) {
+        if (queue.length === 0) {
+          if (closedUnexpectedly) {
+            throw new Error('Lost connection to the /ask service before it finished responding.')
+          }
+          await new Promise<void>((resolve) => {
+            resolveNext = resolve
+          })
+          continue
+        }
+        const msg = queue.shift() as AskServerMessage
+        if (msg.type === 'chunk') {
+          yield msg.text
+        } else if (msg.type === 'done') {
+          return
+        } else {
+          throw new Error(msg.message)
+        }
+      }
+    } finally {
+      ws.close()
+    }
+  },
+}

@@ -4,7 +4,7 @@ import { MessageList } from './components/MessageList'
 import { InputBox } from './components/InputBox'
 import { fetchAdvice } from './api/advice'
 import { fetchChampionNames } from './api/championList'
-import { mockAskClient } from './api/ask.mock'
+import { askClient } from './api/ask'
 import { mockLcuClient, type LcuChampSelectState } from './api/lcu.mock'
 import { parseSlashCommand } from './commands'
 import type { ChatMessage } from './chatTypes'
@@ -56,24 +56,29 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function runAskMock(question: string) {
+  async function runAsk(question: string) {
     const state = champSelectRef.current
     const assistantId = nextId()
     pushMessage({ id: assistantId, kind: 'assistant-text', text: '', streaming: true })
     setBusy(true)
     try {
-      // /ask is unbuilt server-side: mockAskClient stands in behind the
-      // AskClient interface (src/api/ask.mock.ts) until it's real.
-      for await (const chunk of mockAskClient.ask({
+      for await (const chunk of askClient.ask({
         question,
         champA: state?.champA ?? 'unknown',
         champB: state?.champB ?? 'unknown',
+        role: state?.role ?? 'unknown',
         rank: state?.rank ?? 'unknown',
       })) {
         setMessages((prev) =>
           prev.map((m) => (m.id === assistantId && m.kind === 'assistant-text' ? { ...m, text: m.text + chunk } : m)),
         )
       }
+    } catch (err) {
+      pushMessage({
+        id: nextId(),
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'The /ask request failed unexpectedly.',
+      })
     } finally {
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId && m.kind === 'assistant-text' ? { ...m, streaming: false } : m)),
@@ -86,7 +91,7 @@ export default function App() {
     pushMessage({ id: nextId(), kind: 'user', text })
 
     if (!text.startsWith('/')) {
-      await runAskMock(text)
+      await runAsk(text)
       return
     }
 
@@ -116,7 +121,7 @@ export default function App() {
           await fetchAndRenderAdvice(command.champA, command.champB, command.role, command.rank)
           return
         case 'ask':
-          await runAskMock(command.question)
+          await runAsk(command.question)
           return
       }
     } catch {

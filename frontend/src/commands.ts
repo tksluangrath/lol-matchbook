@@ -1,12 +1,12 @@
 /**
  * Slash-command parsing for the chat input. Only input starting with `/`
- * reaches this module -- everything else keeps going to the existing
- * /ask mock unchanged (App.tsx makes that routing decision, not this file).
+ * reaches this module -- everything else keeps going to /ask unchanged
+ * (App.tsx makes that routing decision, not this file).
  *
  * Fixes the earlier confusion where `/advice kayn vs warwick` silently
- * fell through to the /ask mock and got echoed like plain text: any
- * unrecognized slash input now returns an explicit `unrecognized` result
- * instead of nothing / a mock echo.
+ * fell through to /ask and got echoed like plain text: any unrecognized
+ * slash input now returns an explicit `unrecognized` result instead of
+ * nothing / an /ask echo.
  */
 
 // Real values confirmed against the live DB (Advice.role / Advice.rank_bracket
