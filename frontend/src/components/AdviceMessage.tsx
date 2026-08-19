@@ -75,6 +75,8 @@ export function AdviceMessage({ champA, champB, result }: Props) {
         <>
           <p className="advice-note">
             No matchup-specific advice computed for this pair yet -- here's general info on each champion instead.
+            Only a portion of real matchups are precomputed so far, so this is expected for less-common pairs, not a
+            sign anything is broken.
           </p>
           <p>
             <strong>{champA}:</strong> {result.champABlurb}
