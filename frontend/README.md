@@ -5,13 +5,16 @@ tags: []
 
 # frontend
 
-React + Vite chat UI for the champ-select and follow-up paths (see `docs/build-plan.md` Phase 5, `docs/system-design.md`).
+React + Vite chat UI for the champ-select and follow-up paths (see `docs/system-design.md`).
 
-## What's scaffolded
+## What's built
 
+- `src/commands.ts` — slash-command parser for the chat input: `/advice <champA> vs <champB> [rank] [role]`, `/ask <question>`, `/help`. Champion names are matched against the real live Data Dragon champion list; rank/role tokens are optional to type -- see the dropdowns below.
+- `src/components/InputBox.tsx` — the chat input, plus rank and role `<select>` dropdowns. Picking from them appends the values onto a typed `/advice` command that omits them; typing a rank/role explicitly still works and isn't overridden.
 - `src/api/advice.ts` — real client for `GET /advice` (backend/app/routers/advice.py). `classifyAdviceResponse()` is a pure function that turns the real 5-shape response contract (confirmed by reading advice.py + its integration tests, not assumed) into a discriminated `AdviceResult` union: `hit`, `wider_rank_fallback`, `abstention`, `archetype_fallback`, `not_precomputed`.
-- `src/components/AdviceMessage.tsx` — renders each `AdviceResult` state with its mapped accent color and explicit copy.
-- `src/components/MessageList.tsx`, `src/components/InputBox.tsx`, `src/App.tsx` — the chat shell: message list (`role="log"`, `aria-live="polite"`), streaming assistant text, and a keyboard-submittable input box.
+- `src/api/ask.ts` — real client for `POST /ask` (backend/app/routers/ask.py, a WebSocket). Handles `chunk` (streamed text), `warning` (a non-fatal fact-grounding flag on the finished answer), and `done`/`error`.
+- `src/components/AdviceMessage.tsx` — renders each `AdviceResult` state with its mapped accent color and explicit copy; also home to `splitIntoSentences()` and `renderInlineMarkdown()`, shared by both `/advice` phase bullets and finished `/ask` responses (the latter via `MessageList.tsx`).
+- `src/components/MessageList.tsx`, `src/App.tsx` — the chat shell: message list (`role="log"`, `aria-live="polite"`), streaming assistant text, and command routing.
 - `src/theme.ts` / `src/theme.css` — the fixed color tokens and the state-to-color mapping.
 - `src/contrast.ts` — real WCAG relative-luminance/contrast-ratio math, used by `src/contrast.test.ts` to verify (not assume) the grey states pass AA.
 
@@ -33,9 +36,8 @@ The real `GET /advice` endpoint has **five** distinct response shapes, one more 
 
 ## Mocked interfaces (swap points)
 
-Two things are unbuilt on the backend and mocked here behind small, named interfaces so replacing them later touches one file:
+`POST /ask` is real now (see `src/api/ask.ts` above) -- the mock that preceded it (`ask.mock.ts`) has been removed. One thing is still unbuilt on the backend and mocked here behind a small, named interface:
 
-- **`POST /ask`** (the streamed follow-up path) — mocked in `src/api/ask.mock.ts` behind the `AskClient` interface (`ask(req): AsyncGenerator<string>`), yielding words incrementally to mimic real chunked streaming. Swap: write `src/api/ask.ts` exporting a real `AskClient` that reads a real streamed HTTP response, then change the one import in `src/App.tsx`.
 - **LCU auto-detection** (League client champ-select push) — mocked in `src/api/lcu.mock.ts` behind the `LcuClient` interface (`onChampSelect(callback): unsubscribe`). Swap: write `src/api/lcu.ts` exporting a real `LcuClient` that subscribes to the backend's real push channel, then change the one import in `src/App.tsx`.
 
 ## Testing
@@ -45,4 +47,4 @@ npm test        # vitest run
 npm run build   # tsc -b && vite build
 ```
 
-18 tests cover: all 5 real `/advice` response shapes rendering with the correct accent color and distinct copy, keyboard navigation and submission on the input box, ARIA roles on chat messages (`log`/`article`/`alert`), and the grey-state WCAG AA contrast ratios (calculated, not assumed — see `src/contrast.test.ts`).
+44 tests cover: all 5 real `/advice` response shapes rendering with the correct accent color and distinct copy, the slash-command parser (including champion-name/rank/role matching and the dropdown-append behavior), keyboard navigation and submission on the input box, ARIA roles on chat messages (`log`/`article`/`alert`), inline-markdown rendering, and the grey-state WCAG AA contrast ratios (calculated, not assumed — see `src/contrast.test.ts`).

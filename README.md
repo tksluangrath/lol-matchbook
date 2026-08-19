@@ -16,31 +16,30 @@ Champ select gives you roughly 30 seconds to lock in a pick. This app auto-detec
 
 ## Read this first
 
-Start with [`docs/build-plan.md`](./docs/build-plan.md) — it's the phased build order and the one doc meant to be worked through top to bottom. The rest are reference:
+`docs/decisions/*.md` is the real build history — each phase's diagnostics, real measurements, and the reasoning behind every architecture call, written as-they-happened and never edited after the fact (a later correction gets a new doc or an "UPDATE" section, not a rewrite). It's the closest thing to a build plan this repo has publicly. `docs/build-plan.md`, `docs/adr-001-architecture.md`, `docs/system-design.md`, `docs/tech-stack.md`, `docs/testing-strategy.md`, and `docs/architecture-evaluation.md` are the original planning docs referenced throughout those decisions -- they exist locally but are gitignored (internal planning docs, not part of the public repo), so a fresh clone won't have them.
 
-- [`docs/adr-001-architecture.md`](./docs/adr-001-architecture.md) — the core architecture decision (hybrid fine-tune + RAG, precompute over live generation) and why.
-- [`docs/system-design.md`](./docs/system-design.md) — components, data flow, storage, APIs, and the testing & evaluation plan for the model itself.
-- [`docs/tech-stack.md`](./docs/tech-stack.md) — every stack choice (Tauri, FastAPI, Postgres/pgvector via `pgserver`, `llama-cpp-python`, local embeddings) with pros/cons.
-- [`docs/testing-strategy.md`](./docs/testing-strategy.md) — code-level test plan (unit/integration/E2E) by component.
-- [`docs/architecture-evaluation.md`](./docs/architecture-evaluation.md) — a critical review of the above, including one open finding (precompute throughput was never sized) that Phase 0 of the build plan exists to resolve.
-- [`frontend/README.md`](./frontend/README.md) — the chat UI's palette/state-to-color mapping and which two interfaces (`POST /ask`, LCU auto-detection) are currently mocked and where to swap them in.
+- [`frontend/README.md`](./frontend/README.md) — the chat UI's palette/state-to-color mapping, what's real vs. still mocked, and current test coverage.
 
 ## Repo layout
 
 ```
-backend/    FastAPI app: API routes, LCU listener, data pipeline, retrieval, LLM fine-tune + serving
-frontend/   React + Vite chat UI
-desktop/    Tauri shell (wraps backend as a sidecar, frontend as the webview)
-docs/       Planning docs (read these before touching code)
+backend/    FastAPI app: /advice, /ask (WebSocket), /refresh routes; LCU listener; data pipeline
+            (Riot match aggregation, precompute); retrieval; LLM fine-tune + GGUF serving
+frontend/   React + Vite chat UI -- slash commands (/advice, /ask, /help), rank/role dropdowns,
+            champ-select auto-detect (still mocked, see frontend/README.md)
+desktop/    Tauri shell (wraps backend as a sidecar, frontend as the webview) -- not started yet
+docs/       docs/decisions/ (public build history) + gitignored internal planning docs
 ```
 
 ## Status
 
-Pre-build. See `docs/build-plan.md` Phase 0 for what needs deciding before any of the scaffolding below is filled in.
+Backend and frontend are both real and running: a tiered precompute pipeline (eager-tier DB
+lookups plus a lazy wider-rank/archetype fallback, `docs/decisions/tiered-fallback-design.md`)
+backs `/advice`, and a fine-tuned adapter serves live follow-up questions through `/ask`. Desktop
+packaging (Tauri, the last build phase) hasn't started -- today this runs as a local dev server
+pair, not a packaged app.
 
 ## Setup
-
-Not yet runnable end to end — this is scaffolding, not a working app. Once Phase 0-1 of the build plan are done:
 
 ```
 # backend
@@ -48,6 +47,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp ../.env.example ../.env   # fill in your Riot API key
+uvicorn app.main:app --reload
 
 # frontend
 cd ../frontend
@@ -55,7 +55,10 @@ npm install
 npm run dev
 ```
 
-Tauri setup (Phase 6) isn't scaffolded yet — see `desktop/README.md`.
+Or `docker compose up` from the repo root for the backend alone (dev/CI convenience, not the
+product's eventual packaging path -- see `docs/decisions/phase-docker-dev-ci-setup.md`).
+
+Desktop packaging (Tauri) hasn't been scaffolded yet -- no `desktop/README.md` exists.
 
 ## License
 
