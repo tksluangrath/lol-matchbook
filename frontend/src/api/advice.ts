@@ -37,7 +37,11 @@ export type AdviceResult =
   | { kind: 'archetype_fallback'; champABlurb: string; champBBlurb: string }
   | { kind: 'not_precomputed' }
 
-export const DEFAULT_ADVICE_BASE_URL = 'http://127.0.0.1:8000'
+// VITE_API_URL is the one env var a hosted deployment (e.g. a Render Static
+// Site pointed at a separately-deployed backend) needs to set -- Vite only
+// exposes client-code env vars prefixed VITE_. Falls back to local dev's
+// real backend address when unset, so nothing changes for `npm run dev`.
+export const DEFAULT_ADVICE_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000'
 
 export function classifyAdviceResponse(status: number, body: Record<string, unknown>): AdviceResult {
   if (status === 404 || body.status === 'not_precomputed') {

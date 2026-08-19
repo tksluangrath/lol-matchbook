@@ -34,7 +34,14 @@ export interface AskClient {
   ask(req: AskRequest): AsyncGenerator<string, void, unknown>
 }
 
-export const DEFAULT_ASK_WS_URL = 'ws://127.0.0.1:8000/ask'
+// Derived from the same VITE_API_URL as advice.ts's DEFAULT_ADVICE_BASE_URL
+// -- one env var for a hosted deployment to set, not two, since it's the
+// same backend origin either way. http(s) -> ws(s): the leading "http" in
+// "https://" is also replaced, correctly producing "wss://" (the trailing
+// "s" is untouched by the replace, so "https" -> "wss", not "wshttps").
+import { DEFAULT_ADVICE_BASE_URL } from './advice'
+
+export const DEFAULT_ASK_WS_URL = `${DEFAULT_ADVICE_BASE_URL.replace(/^http/, 'ws')}/ask`
 
 type AskServerMessage =
   | { type: 'chunk'; text: string }
