@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "lol-matchbook",
+  "productName": "LoL Matchbook",
   "version": "0.1.0",
   "identifier": "com.lolmatchbook.desktop",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "lol-matchbook",
+        "title": "LoL Matchbook",
         "width": 800,
         "height": 600,
         "resizable": true,
