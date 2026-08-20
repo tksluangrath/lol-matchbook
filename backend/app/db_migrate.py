@@ -15,6 +15,7 @@ this writing, per the spike doc's "Environment note") -- run this under a
 from __future__ import annotations
 
 import os
+import sys
 
 import pgserver
 from sqlalchemy import create_engine
@@ -22,14 +23,47 @@ from sqlalchemy.engine import Engine
 
 from app.models import Base
 
-# ponytail: repo-relative default so `python -m app.db_migrate` works out of
-# the box; override via the pgdata= argument (e.g. a temp dir in tests), or
-# the PGDATA env var (set by Dockerfile to /app/.pgdata -- the repo-relative
+
+def _default_pgdata() -> str:
+    # A PyInstaller onefile bundle (Phase 6's packaged desktop app) extracts
+    # to a fresh, randomly-named temp dir on every single launch --
+    # __file__-relative resolution would then put pgdata inside that
+    # ephemeral tree too, so the app's data would vanish on every restart
+    # (worse, macOS/Windows periodically clear their temp dirs outright).
+    # Confirmed for real during Phase 6's fresh-install smoke test: the
+    # frozen binary's Postgres process was found running with
+    # `-D $TMPDIR/.pgdata`, not a stable location.
+    if getattr(sys, "frozen", False):
+        if sys.platform == "win32":
+            # Real, separate gap found and left as a known limitation
+            # (untested here -- no Windows access this session): a
+            # username with a space (e.g. "C:\Users\John Doe\...") hits
+            # the same pgserver space-splitting bug as the one fixed
+            # below for macOS. %APPDATA% isn't swappable the way macOS's
+            # base dir choice was -- would need a real Windows fix (e.g.
+            # a short-path/8.3 conversion) verified on that platform.
+            base = os.environ.get("APPDATA", os.path.expanduser("~"))
+            return os.path.join(base, "lol-matchbook", "pgdata")
+        # Not `~/Library/Application Support` (the normal macOS
+        # convention) -- confirmed for real during this session's
+        # fresh-install smoke test that pgserver's socket-dir handling
+        # breaks on that path's space: it embeds the dir in a
+        # `pg_ctl -o "-k <dir>"` string that gets re-split on whitespace,
+        # and only swaps to a fallback directory when the path is too
+        # long, never when it contains a space. Real error observed:
+        # `postgres: invalid argument: "Support/lol-matchbook/pgdata"`.
+        # A home dotdir has no such space on macOS or Linux.
+        return os.path.join(os.path.expanduser("~"), ".lol-matchbook", "pgdata")
+    # ponytail: repo-relative default so `python -m app.db_migrate` works
+    # out of the box in source form (dev, tests, Docker).
+    return os.path.join(os.path.dirname(__file__), "..", "..", ".pgdata")
+
+
+# Override via the pgdata= argument (e.g. a temp dir in tests), or the
+# PGDATA env var (set by Dockerfile to /app/.pgdata -- the repo-relative
 # "../.." path resolves outside /app inside the container, which the
 # non-root app user can't write to; real PermissionError caught by CI).
-DEFAULT_PGDATA = os.environ.get("PGDATA") or os.path.join(
-    os.path.dirname(__file__), "..", "..", ".pgdata"
-)
+DEFAULT_PGDATA = os.environ.get("PGDATA") or _default_pgdata()
 
 
 def start_pgserver(pgdata: str) -> "pgserver.PostgresServer":
