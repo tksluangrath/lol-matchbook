@@ -33,11 +33,14 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="lol-matchup-copilot backend", lifespan=lifespan)
 
-# ponytail: dev-scoped to the Vite dev server's fixed port -- widen (or
-# swap to Tauri's asset origin) when the frontend has a real deploy target.
+# Dev-scoped Vite origins plus the real deployed Render Static Site.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://lol-matchup-copilot.onrender.com",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
