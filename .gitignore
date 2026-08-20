@@ -20,6 +20,9 @@ dist/
 # rust / tauri
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+# sidecar binary -- regenerate via `pyinstaller backend/lol-matchbook-backend.spec`
+# then copy to desktop/src-tauri/binaries/lol-matchbook-backend-<target-triple>
+desktop/src-tauri/binaries/
 
 # db / embedded postgres data -- DEFAULT_PGDATA in backend/app/db_migrate.py
 # resolves to the repo root (../.. from backend/app/), not backend/, so the

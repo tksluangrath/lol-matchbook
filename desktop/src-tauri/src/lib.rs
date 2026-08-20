@@ -1,6 +1,19 @@
+use std::sync::Mutex;
+use tauri::Manager;
+use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::ShellExt;
+
+// Holds the running backend sidecar's handle so it can be killed on app
+// exit -- the sidecar has its own lifetime independent of the webview
+// window, and PyInstaller-bundled processes don't die with their parent
+// on their own.
+struct BackendProcess(Mutex<Option<CommandChild>>);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .plugin(tauri_plugin_shell::init())
+    .manage(BackendProcess(Mutex::new(None)))
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -9,8 +22,37 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      let (_rx, child) = app
+        .shell()
+        .sidecar("lol-matchbook-backend")
+        .expect("failed to resolve the backend sidecar binary")
+        .spawn()
+        .expect("failed to spawn the backend sidecar");
+
+      *app.state::<BackendProcess>().0.lock().unwrap() = Some(child);
+
       Ok(())
     })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app_handle, event| {
+      // RunEvent::Exit, not WindowEvent::Destroyed -- a real test here
+      // (killing the app process directly, simulating a force-quit)
+      // showed Destroyed only fires on a graceful window close, leaving
+      // the sidecar orphaned on process-level termination. Exit fires
+      // for both a real app quit and the window closing, so this is the
+      // one place that reliably catches both.
+      if let tauri::RunEvent::Exit = event {
+        if let Some(child) = app_handle
+          .state::<BackendProcess>()
+          .0
+          .lock()
+          .unwrap()
+          .take()
+        {
+          let _ = child.kill();
+        }
+      }
+    });
 }
