@@ -7,6 +7,7 @@ import { fetchChampionNames } from './api/championList'
 import { askClient } from './api/ask'
 import { lcuClient, HOSTED_DEMO, type LcuChampSelectState } from './api/lcu'
 import { parseSlashCommand } from './commands'
+import { submitReport, type ReportCategory } from './api/report'
 import type { ChatMessage } from './chatTypes'
 
 let idCounter = 0
@@ -107,6 +108,27 @@ export default function App() {
     }
   }
 
+  async function runReport(category: ReportCategory, message: string) {
+    const state = champSelectRef.current
+    try {
+      await submitReport({
+        category,
+        message,
+        champA: state?.champA,
+        champB: state?.champB,
+        role: state?.role,
+        rank: state?.rank,
+      })
+      pushMessage({ id: nextId(), kind: 'assistant-text', text: 'Thanks, report submitted.', streaming: false })
+    } catch (err) {
+      pushMessage({
+        id: nextId(),
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'The /report request failed unexpectedly.',
+      })
+    }
+  }
+
   async function handleSubmit(text: string) {
     pushMessage({ id: nextId(), kind: 'user', text })
 
@@ -128,6 +150,7 @@ export default function App() {
           pushMessage({ id: nextId(), kind: 'help' })
           return
         case 'advice_incomplete':
+        case 'report_incomplete':
           pushMessage({ id: nextId(), kind: 'error', text: command.message })
           return
         case 'unrecognized':
@@ -139,6 +162,9 @@ export default function App() {
           return
         case 'advice':
           await fetchAndRenderAdvice(command.champA, command.champB, command.role, command.rank)
+          return
+        case 'report':
+          await runReport(command.category, command.message)
           return
         case 'ask':
           await runAsk(command.question)

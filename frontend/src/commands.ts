@@ -31,11 +31,24 @@ export type Rank = (typeof REAL_RANKS)[number]
 
 const ROLE_ALIASES: Record<string, Role> = { utility: 'support' }
 
+// 'bug' | 'matchup_mistake' -- kept in sync with backend/app/models.py's
+// Report.category CheckConstraint by hand (small, fixed set, not worth a
+// shared schema for two literal strings).
+export const REPORT_CATEGORIES = ['bug', 'matchup'] as const
+type ReportSubcommand = (typeof REPORT_CATEGORIES)[number]
+export type ReportCategory = 'bug' | 'matchup_mistake'
+const REPORT_CATEGORY_MAP: Record<ReportSubcommand, ReportCategory> = {
+  bug: 'bug',
+  matchup: 'matchup_mistake',
+}
+
 export type ParsedCommand =
   | { kind: 'help' }
   | { kind: 'ask'; question: string }
   | { kind: 'advice'; champA: string; champB: string; rank: Rank; role: Role }
   | { kind: 'advice_incomplete'; message: string }
+  | { kind: 'report'; category: ReportCategory; message: string }
+  | { kind: 'report_incomplete'; message: string }
   | { kind: 'unrecognized'; raw: string }
 
 /** Structured, not a flat string -- rendered as a real list in the UI
@@ -48,6 +61,10 @@ export const HELP_COMMANDS: { command: string; description: string }[] = [
     description: 'Real precomputed matchup advice',
   },
   { command: '/ask <question>', description: 'Placeholder only, not real retrieval yet' },
+  {
+    command: '/report <bug|matchup> <message>',
+    description: 'Flag a bug or a wrong-looking matchup call',
+  },
 ]
 
 /** Strips punctuation/spaces and lowercases, so "Kai'Sa" / "kaisa" / "Kai Sa" all match. */
@@ -153,6 +170,27 @@ function parseAdvice(argsText: string, realChampionNames: string[]): ParsedComma
   return { kind: 'advice', champA: champA as string, champB: champB as string, rank, role }
 }
 
+function parseReport(argsText: string): ParsedCommand {
+  const firstSpace = argsText.indexOf(' ')
+  const subcommand = (firstSpace === -1 ? argsText : argsText.slice(0, firstSpace)).toLowerCase()
+  const message = (firstSpace === -1 ? '' : argsText.slice(firstSpace + 1)).trim()
+
+  const category = matchToken(subcommand, REPORT_CATEGORIES)
+  if (!category) {
+    return {
+      kind: 'report_incomplete',
+      message: `Usage: /report <bug|matchup> <message>. Got unrecognized category "${subcommand || '<none>'}".`,
+    }
+  }
+  if (!message) {
+    return {
+      kind: 'report_incomplete',
+      message: `Missing report message -- try: /report ${subcommand} <what happened>`,
+    }
+  }
+  return { kind: 'report', category: REPORT_CATEGORY_MAP[category], message }
+}
+
 export function parseSlashCommand(input: string, realChampionNames: string[]): ParsedCommand {
   const trimmed = input.trim()
   const firstSpace = trimmed.indexOf(' ')
@@ -162,5 +200,6 @@ export function parseSlashCommand(input: string, realChampionNames: string[]): P
   if (word === 'help') return { kind: 'help' }
   if (word === 'ask') return { kind: 'ask', question: rest }
   if (word === 'advice') return parseAdvice(rest, realChampionNames)
+  if (word === 'report') return parseReport(rest)
   return { kind: 'unrecognized', raw: trimmed }
 }

@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 import app.db as db
 from app.config import settings
 from app.db_migrate import migrate
-from app.routers import advice, ask, lcu, refresh
+from app.routers import advice, ask, lcu, refresh, report
 
 
 @asynccontextmanager
@@ -49,6 +49,7 @@ app.include_router(advice.router)
 app.include_router(ask.router)
 app.include_router(refresh.router)
 app.include_router(lcu.router)
+app.include_router(report.router)
 
 
 @app.get("/health")

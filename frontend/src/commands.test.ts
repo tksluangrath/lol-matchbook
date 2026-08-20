@@ -122,4 +122,34 @@ describe('parseSlashCommand', () => {
       expect(result.message).toMatch(/missing champB/i)
     }
   })
+
+  it('/report bug <message> resolves to a bug report', () => {
+    const result = parseSlashCommand('/report bug the rank dropdown reset', REAL_CHAMPIONS)
+    expect(result).toEqual({ kind: 'report', category: 'bug', message: 'the rank dropdown reset' })
+  })
+
+  it('/report matchup <message> resolves to a matchup_mistake report', () => {
+    const result = parseSlashCommand('/report matchup this feels wrong for Aatrox top', REAL_CHAMPIONS)
+    expect(result).toEqual({
+      kind: 'report',
+      category: 'matchup_mistake',
+      message: 'this feels wrong for Aatrox top',
+    })
+  })
+
+  it('/report with an unrecognized category is flagged, not silently dropped', () => {
+    const result = parseSlashCommand('/report typo this is a bug', REAL_CHAMPIONS)
+    expect(result.kind).toBe('report_incomplete')
+    if (result.kind === 'report_incomplete') {
+      expect(result.message).toMatch(/bug\|matchup/)
+    }
+  })
+
+  it('/report missing a message prompts inline instead of firing an empty request', () => {
+    const result = parseSlashCommand('/report bug', REAL_CHAMPIONS)
+    expect(result.kind).toBe('report_incomplete')
+    if (result.kind === 'report_incomplete') {
+      expect(result.message).toMatch(/missing report message/i)
+    }
+  })
 })

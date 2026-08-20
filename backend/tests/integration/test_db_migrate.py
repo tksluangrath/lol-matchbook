@@ -51,6 +51,16 @@ EXPECTED_COLUMNS = {
         "requested_at",
         "status",
     },
+    "reports": {
+        "id",
+        "category",
+        "message",
+        "champ_a",
+        "champ_b",
+        "role",
+        "rank_bracket",
+        "created_at",
+    },
 }
 
 

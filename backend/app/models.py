@@ -107,3 +107,25 @@ class BackfillQueue(Base):
     phase = Column(String, nullable=False)
     requested_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     status = Column(String, nullable=False, default="pending")
+
+
+class Report(Base):
+    """User-submitted bug/matchup-mistake report, via the /report slash
+    command. champ_a/champ_b/role/rank are nullable -- a general bug report
+    (no champ select context, or none active at the time) is still a valid
+    report, not a rejected one.
+    """
+    __tablename__ = "reports"
+
+    id = Column(Integer, primary_key=True)
+    category = Column(String, nullable=False)  # 'bug' | 'matchup_mistake'
+    message = Column(String, nullable=False)
+    champ_a = Column(String, nullable=True)
+    champ_b = Column(String, nullable=True)
+    role = Column(String, nullable=True)
+    rank_bracket = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        CheckConstraint("category IN ('bug', 'matchup_mistake')", name="ck_report_category"),
+    )
