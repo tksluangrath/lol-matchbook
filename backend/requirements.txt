@@ -30,10 +30,10 @@ torch
 vllm
 
 # Live follow-up path: CPU-quantized, embedded in-process. See docs/tech-stack.md #5
-# Windows: needs LongPathsEnabled=1 (admin) or a prebuilt wheel -- see
-# docs note. As of this writing no Windows wheel exists for this
-# package's current pinned version, so plain `pip install` falls back
-# to a source build that hits Windows' MAX_PATH limit mid-build.
+# Windows: builds from source (no PyPI Windows wheel) -- needs
+# LongPathsEnabled=1 (admin, one-time reg add) and MSVC Build Tools
+# (C++ workload) installed. Confirmed working on Windows with both in
+# place: builds a real wheel locally via pip, no further workaround needed.
 llama-cpp-python
 
 # Local embeddings for the retrieval layer -- zero cost, no cloud API. docs/tech-stack.md #7

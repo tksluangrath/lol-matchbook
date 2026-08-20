@@ -13,6 +13,7 @@ click==8.4.2
 colorama==0.4.6
 datasets==5.0.1
 dill==0.4.1
+diskcache==5.6.3
 fastapi==0.141.1
 fasteners==0.20
 filelock==3.32.3
@@ -29,6 +30,7 @@ idna==3.19
 iniconfig==2.3.0
 Jinja2==3.1.6
 joblib==1.5.3
+llama_cpp_python==0.3.35
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
