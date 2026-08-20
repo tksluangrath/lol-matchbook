@@ -4,7 +4,7 @@ tags: []
 
 ---
 
-# lol-matchup-copilot
+# lol-matchbook
 
 A local, rank-aware League of Legends matchup assistant. Detects your champ-select pick/ban state automatically and gives instant early/mid/late-game matchup advice through a chat-style interface, backed by a small fine-tuned LLM plus a retrieval layer that stays current with the patch cycle without retraining.
 

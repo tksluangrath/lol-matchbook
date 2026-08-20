@@ -31,7 +31,7 @@ async def lifespan(_: FastAPI):
     server.cleanup()
 
 
-app = FastAPI(title="lol-matchup-copilot backend", lifespan=lifespan)
+app = FastAPI(title="lol-matchbook backend", lifespan=lifespan)
 
 # Dev-scoped Vite origins plus the real deployed Render Static Site.
 app.add_middleware(

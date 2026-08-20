@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     riot_platform: str = "na1"
     riot_region: str = "americas"
 
-    database_url: str = "postgresql://localhost:5432/lol_matchup_copilot"
+    database_url: str = "postgresql://localhost:5432/lol_matchbook"
 
     adapter_path: str = ""
     followup_model_path: str = ""
