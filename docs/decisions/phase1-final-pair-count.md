@@ -1,8 +1,3 @@
----
-noteId: "phase1-final-pair-count"
-tags: []
----
-
 # Phase 1 — Final same-lane pair count (data-quality fix + threshold fix, combined)
 
 **Task:** two independent corrections to the original 9,204 same-lane pair count existed but had never been combined: `phase1-role-pair-count-corrected.md` fixed the ranked-only-filter/dedup bug but stayed at the original 5% threshold; `phase1-role-threshold-sensitivity.md` recommended 10% over 5% but tested only on the original, unfiltered data. This file applies both fixes together.

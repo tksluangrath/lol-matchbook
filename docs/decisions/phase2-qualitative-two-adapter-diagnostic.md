@@ -1,9 +1,3 @@
----
-noteId: "phase2qualitativetwoadapterdiagnostic0001"
-tags: []
-
----
-
 # Phase 2 Qualitative Two-Adapter Diagnostic
 
 **Status: DONE. v1: 7/10. v2 (retrained on more data): 10/10 held-out pairs

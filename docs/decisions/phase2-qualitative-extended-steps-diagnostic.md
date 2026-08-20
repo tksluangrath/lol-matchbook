@@ -1,9 +1,3 @@
----
-noteId: "e7738f20982811f1af4f3319e0cf7c04"
-tags: []
-
----
-
 # Phase 2 Qualitative Extended-Steps Diagnostic — AGENT-24
 
 **Status: BLOCKED (killed by user after real duration divergence).**

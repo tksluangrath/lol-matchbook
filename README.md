@@ -1,9 +1,3 @@
----
-noteId: "2a38c83091f711f1a408bdbca18563c4"
-tags: []
-
----
-
 # lol-matchbook
 
 A local, rank-aware League of Legends matchup assistant. Detects your champ-select pick/ban state automatically and gives instant early/mid/late-game matchup advice through a chat-style interface, backed by a small fine-tuned LLM plus a retrieval layer that stays current with the patch cycle without retraining.

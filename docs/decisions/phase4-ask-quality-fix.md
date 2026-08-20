@@ -1,9 +1,3 @@
----
-noteId: "phase4askqualityfix0001"
-tags: []
-
----
-
 # Phase 4: Fixing /ask's Output Quality — Real Root Cause, Real Before/After
 
 **Status: DONE.** Root cause confirmed by reading the actual code, not

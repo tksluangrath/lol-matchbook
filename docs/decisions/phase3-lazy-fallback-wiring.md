@@ -1,9 +1,3 @@
----
-noteId: "phase3lazyfallbackwiring0001"
-tags: []
-
----
-
 # Phase 3: Lazy-Tier Fallback Wiring — Real Measurements
 
 **Status: DONE.** `GET /advice` now implements `docs/system-design.md`'s

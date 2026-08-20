@@ -1,9 +1,3 @@
----
-noteId: "phase3contaminatedrowregeneration0001"
-tags: []
-
----
-
 # Phase 3: Regenerating the 2 Markup-Contaminated Pairs
 
 **Status: DONE, 1 of 2 pairs regenerated clean.** Real regeneration run

@@ -1,9 +1,3 @@
----
-noteId: "phase3precomputeadviceendpoint0001"
-tags: []
-
----
-
 # Phase 3: Precompute Batch + /advice Endpoint — Real End-to-End Slice
 
 **Status: DONE.** `run_precompute_batch` implemented and run for real (10

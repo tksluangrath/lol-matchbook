@@ -1,9 +1,3 @@
----
-noteId: "phase3eagertierprecompute0001"
-tags: []
-
----
-
 # Phase 3: Eager-Tier Scale-Up — Real Candidate Pool, Real Throughput, Real N
 
 **Status: DONE.** Real top-109 run completed: **82 written, 27 skipped, 0

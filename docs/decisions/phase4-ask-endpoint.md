@@ -1,9 +1,3 @@
----
-noteId: "phase4askendpoint0001"
-tags: []
-
----
-
 # Phase 4: The `/ask` Endpoint — Real WebSocket, Real GGUF Generation, Real CPU-Only Confirmation
 
 **Status: DONE.** Real WebSocket round trip against a real running server,

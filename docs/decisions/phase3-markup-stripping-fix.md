@@ -1,9 +1,3 @@
----
-noteId: "phase3markupstrippingfix0001"
-tags: []
-
----
-
 # Phase 3: Data Dragon Markup Stripping Fix
 
 **Status: DONE.**

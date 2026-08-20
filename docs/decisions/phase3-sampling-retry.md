@@ -1,9 +1,3 @@
----
-noteId: "phase3samplingretry0001"
-tags: []
-
----
-
 # Phase 3: Sampling-Retry Fallback for the 7 Ability-Whitelist Holdouts
 
 **Status: DONE.** Added a bounded sampling-retry fallback for pairs that

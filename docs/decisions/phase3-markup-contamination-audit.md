@@ -1,9 +1,3 @@
----
-noteId: "phase3markupcontaminationaudit0001"
-tags: []
-
----
-
 # Phase 3: Markup Contamination Audit — the 82 Real Written Rows
 
 **Status: DONE.** Checked every row from the real top-109 eager-tier batch

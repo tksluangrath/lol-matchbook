@@ -1,8 +1,3 @@
----
-noteId: "phase1-role-pair-count-corrected"
-tags: []
----
-
 # Phase 1 — Corrected same-lane pair count (ranked-only + deduplicated)
 
 **Task:** `docs/decisions/phase1-role-pair-count.md` computed the same-lane pair count (9,204 at the 5% threshold; 6,500 at the current 10% threshold) directly from the raw BoostedJonP CSV, before AGENT-8's `backend/app/data_pipeline/aggregate.py` discovered the file is **not** pre-filtered to ranked solo/duo (it mixes in queue 440 "ranked flex" and queue 1700 "arena" rows) and contains **~37% exact-duplicate participant rows**. Neither filter was applied to the original 9,204 computation. This file redoes that computation on the corrected data, reusing AGENT-8's actual filtering code (`filter_valid_matches`, `load_hf_csv_matches`) via import — no filtering logic is reimplemented here.

@@ -1,9 +1,3 @@
----
-noteId: "phase4ggufconversion0001"
-tags: []
-
----
-
 # Phase 4: GGUF Conversion + CPU Serving — Real Merge, Real Quantization, Real Regression Found
 
 **Status: DONE, with a real negative finding.** Merge, GGUF conversion,

@@ -1,9 +1,3 @@
----
-noteId: "phase3abilitywhitelistretry0001"
-tags: []
-
----
-
 # Phase 3: Ability-Name Whitelist and Retry of the Grounding-Check Skips
 
 **Status: DONE.** Added an explicit ability-name whitelist to the generation

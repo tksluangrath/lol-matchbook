@@ -1,8 +1,3 @@
-noteId: "frontend-readme-phase5"
-tags: []
-
----
-
 # frontend
 
 React + Vite chat UI for the champ-select and follow-up paths (see `docs/system-design.md`).
