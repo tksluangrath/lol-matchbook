@@ -11,6 +11,7 @@
     {
       "identifier": "shell:allow-spawn",
       "allow": [{ "name": "binaries/lol-matchbook-backend", "sidecar": true }]
-    }
+    },
+    "autostart:default"
   ]
 }

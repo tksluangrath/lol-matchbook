@@ -1,5 +1,7 @@
 use std::sync::Mutex;
 use tauri::Manager;
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
@@ -13,6 +15,10 @@ struct BackendProcess(Mutex<Option<CommandChild>>);
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_autostart::init(
+      MacosLauncher::LaunchAgent,
+      None,
+    ))
     .manage(BackendProcess(Mutex::new(None)))
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -21,6 +27,15 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+      }
+
+      // launch-on-login, per docs/build-plan.md Phase 6 -- champ select
+      // gives ~30s, so the backend (and its pgserver + model-load startup
+      // cost) needs to already be warm before a game starts, not launched
+      // fresh the first time the user opens the app mid-lobby.
+      let autostart = app.autolaunch();
+      if !autostart.is_enabled().unwrap_or(false) {
+        let _ = autostart.enable();
       }
 
       let (_rx, child) = app
