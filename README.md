@@ -26,7 +26,7 @@ Champ select gives you roughly 30 seconds to lock in a pick. This app auto-detec
 backend/    FastAPI app: /advice, /ask (WebSocket), /refresh routes; LCU listener; data pipeline
             (Riot match aggregation, precompute); retrieval; LLM fine-tune + GGUF serving
 frontend/   React + Vite chat UI -- slash commands (/advice, /ask, /help), rank/role dropdowns,
-            champ-select auto-detect (still mocked, see frontend/README.md)
+            champ-select auto-detect (real, local-League-client only -- see frontend/README.md)
 desktop/    Tauri shell (wraps backend as a sidecar, frontend as the webview) -- not started yet
 docs/       docs/decisions/ (public build history) + gitignored internal planning docs
 ```

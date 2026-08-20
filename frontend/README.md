@@ -34,11 +34,9 @@ Dark mode only, non-negotiable per the design brief:
 
 The real `GET /advice` endpoint has **five** distinct response shapes, one more than the four named in the original design brief (precomputed hit / wider-rank fallback / abstention / not-precomputed). The fifth, `archetype_fallback` (a 200 with real Data Dragon champion blurbs, returned when nothing's precomputed for a pair at any rank but the champions themselves are real), has no color of its own in the brief. It's grouped into the same grey tier as `abstention` and `not_precomputed` (all three are low-confidence, non-matchup-specific outcomes) but keeps its own distinct copy ("general champion info only") so it's never confused with the other two by text alone.
 
-## Mocked interfaces (swap points)
+## LCU auto-detection
 
-`POST /ask` is real now (see `src/api/ask.ts` above) -- the mock that preceded it (`ask.mock.ts`) has been removed. One thing is still unbuilt on the backend and mocked here behind a small, named interface:
-
-- **LCU auto-detection** (League client champ-select push) — mocked in `src/api/lcu.mock.ts` behind the `LcuClient` interface (`onChampSelect(callback): unsubscribe`). Swap: write `src/api/lcu.ts` exporting a real `LcuClient` that subscribes to the backend's real push channel, then change the one import in `src/App.tsx`.
+`POST /ask` and LCU auto-detection are both real now -- the mocks that preceded them (`ask.mock.ts`, `lcu.mock.ts`) have been removed. `src/api/lcu.ts` exports the real `LcuClient` (`onChampSelect(callback): unsubscribe`), subscribing to the backend's real `/lcu` WebSocket (backend/app/routers/lcu.py, backed by `app/lcu/listener.py`'s real LCU polling loop). It works against a locally running League client: the backend reads League's own lockfile from `127.0.0.1` to talk to the client's local API, so it's unavailable in the hosted Render demo, where there's no local League client for the backend to see. Gated behind `VITE_HOSTED_DEMO` (same flag `ask.ts` uses) -- hosted users get an explicit "requires running the backend locally alongside League" message instead of auto-detect silently never firing.
 
 ## Testing
 
