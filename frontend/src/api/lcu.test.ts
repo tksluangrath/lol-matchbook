@@ -22,9 +22,21 @@ class FakeWebSocket {
 
 describe('lcuClient', () => {
   afterEach(() => {
+    vi.unstubAllEnvs()
     vi.unstubAllGlobals()
     vi.resetModules()
     FakeWebSocket.instances = []
+  })
+
+  it('does not attempt a WebSocket connection when VITE_HOSTED_DEMO is set', async () => {
+    vi.stubEnv('VITE_HOSTED_DEMO', 'true')
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const { lcuClient } = await import('./lcu')
+
+    const unsubscribe = lcuClient.onChampSelect(vi.fn())
+
+    expect(FakeWebSocket.instances).toHaveLength(0)
+    expect(() => unsubscribe()).not.toThrow()
   })
 
   it('maps a real "idle" push to null', async () => {

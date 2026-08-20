@@ -8,6 +8,10 @@ pgserver
 sqlalchemy
 pgvector
 psycopg[binary]
+# pgserver.get_uri() returns a plain postgresql:// URI, which SQLAlchemy
+# resolves to the psycopg2 dialect by default (not psycopg[binary]/v3 above)
+# -- without this, app startup crashes with ModuleNotFoundError: psycopg2.
+psycopg2-binary
 
 # Fine-tuning stack -- same as the DS5002 final_project (train.py/benchmark.py)
 transformers

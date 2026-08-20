@@ -16,6 +16,14 @@
  */
 import { DEFAULT_ADVICE_BASE_URL } from './advice'
 
+// Set on the hosted Render Static Site deploy (see ask.ts) -- unset
+// locally. LCU auto-detect polls 127.0.0.1 from wherever the *backend*
+// runs, so on Render that's Render's own container, never the visitor's
+// PC running League: the WebSocket would just idle forever instead of
+// ever detecting anything. Gated here rather than left to silently do
+// nothing, same reasoning as ask.ts's HOSTED_DEMO gate.
+export const HOSTED_DEMO = Boolean(import.meta.env.VITE_HOSTED_DEMO)
+
 export type LcuChampSelectState = {
   champA: string
   champB: string
@@ -36,6 +44,10 @@ type LcuServerMessage =
 
 export const lcuClient: LcuClient = {
   onChampSelect(callback) {
+    if (HOSTED_DEMO) {
+      return () => {}
+    }
+
     const ws = new WebSocket(DEFAULT_LCU_WS_URL)
 
     ws.addEventListener('message', (event) => {

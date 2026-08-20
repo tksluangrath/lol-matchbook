@@ -5,7 +5,7 @@ import { InputBox } from './components/InputBox'
 import { fetchAdvice } from './api/advice'
 import { fetchChampionNames } from './api/championList'
 import { askClient } from './api/ask'
-import { lcuClient, type LcuChampSelectState } from './api/lcu'
+import { lcuClient, HOSTED_DEMO, type LcuChampSelectState } from './api/lcu'
 import { parseSlashCommand } from './commands'
 import type { ChatMessage } from './chatTypes'
 
@@ -46,6 +46,18 @@ export default function App() {
   }
 
   useEffect(() => {
+    // On the hosted demo, the backend can never see the visitor's local
+    // League client (see lcu.ts's HOSTED_DEMO comment) -- say so once
+    // instead of leaving auto-detect silently doing nothing forever.
+    if (HOSTED_DEMO) {
+      pushMessage({
+        id: nextId(),
+        kind: 'error',
+        text: 'Champ-select auto-detect is not available in this hosted demo -- it requires running the backend locally alongside League. Use /advice to enter a matchup manually.',
+      })
+      return
+    }
+
     // The real listener polls every ~1.5s and re-pushes the same state on
     // every tick while champ-select is ongoing (unlike the mock, which
     // fired once) -- only fire a real advice lookup when the state
