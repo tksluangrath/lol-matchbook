@@ -23,9 +23,17 @@ torch
 
 # Batched offline generation for the precompute job -- NOT the same tool as the
 # live follow-up path. See docs/architecture-evaluation.md critical finding.
+# Windows: needs LongPathsEnabled=1 (admin) or a prebuilt wheel -- see
+# docs note. As of this writing no Windows wheel exists for this
+# package's current pinned version, so plain `pip install` falls back
+# to a source build that hits Windows' MAX_PATH limit mid-build.
 vllm
 
 # Live follow-up path: CPU-quantized, embedded in-process. See docs/tech-stack.md #5
+# Windows: needs LongPathsEnabled=1 (admin) or a prebuilt wheel -- see
+# docs note. As of this writing no Windows wheel exists for this
+# package's current pinned version, so plain `pip install` falls back
+# to a source build that hits Windows' MAX_PATH limit mid-build.
 llama-cpp-python
 
 # Local embeddings for the retrieval layer -- zero cost, no cloud API. docs/tech-stack.md #7
